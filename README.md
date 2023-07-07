@@ -16,6 +16,16 @@ This  project is a small, lightweight  library for abstracting repositories  and
 - *getMappedObject* : returns a new instance of the model passed as an array
 
 
+## Installation
+
+You can install this library using [composer](https://getcomposer.org/) with the
+following command:
+
+```
+composer require crimanne/abstract-repo
+```
+
+
 ## Usage
 
 Basically, you need to define the ***Entity*** and the repository that will use it.
