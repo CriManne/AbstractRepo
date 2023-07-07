@@ -84,17 +84,17 @@ abstract class AbstractRepository{
      * Entry function to find by id a Model
      *
      * @param [type] $id
-     * @param string|null $model
+     * @param string|null $class
      * @param string|null $table
      * @throws RepositoryException If it finds multiple results meaning database or entities are not configured properly
      * @return IModel|null
      *
      */
-    public function findById($id,string $model = null,string $table = null): ?IModel{
+    public function findById($id,string $class = null,string $table = null): ?IModel{
 
         // Since this function will be called recursively to handle nesting and foreign keys, it could be
         // called with different modelClasses and tableNames
-        $modelClass = $model ?? $this->modelClass;
+        $modelClass = $class ?? $this->modelClass;
         $tableName = $table ?? $this->tableName;
 
         // Get the key property of the model

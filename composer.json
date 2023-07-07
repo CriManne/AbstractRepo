@@ -1,7 +1,8 @@
 {
     "name": "crimanne/abstract-repo",
-    "description": "A small light-weight library to abstract repositories and avoid writing tons of repository logic.",
+    "description": "A small, lightweight library for abstracting repositories and avoiding writing a lot of repository logic.",
     "version": "0.1.0",
+    "license": "MIT",
     "autoload": {
         "psr-4": {            
             "AbstractRepo\\": "src/"
