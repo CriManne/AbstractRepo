@@ -4,7 +4,7 @@
 
 ## About
 
-This  project is a small, lightweight  library for abstracting repositories  and avoiding writing a lot of repository logic. It uses [Reflection](https://www.php.net/manual/en/book.reflection.php) on the generic and abstract class (*AbstractRepository*) that provides basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) methods.
+This  project is a small, lightweight  library for abstracting repositories  and avoiding writing a lot of repository logic. It uses [Reflection](https://www.php.net/manual/en/book.reflection.php) and [PHP 8 Attributes](https://www.php.net/manual/en/language.attributes.overview.php) on the generic and abstract class (*AbstractRepository*) that provides basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) methods.
 
 ### Methods available:
 - *findAll* :   retrieves every record
