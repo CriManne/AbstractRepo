@@ -64,6 +64,8 @@ RelatedModel $obj;
 ...
 ```
 
+**PLEASE NOTE:** The entity needs the explicit constructor with all the args in order to work.
+
 ### Repository
 After defining the entity, you have to create the repository that must extends the ***AbstractRepository*** class and implements the ***IRepository*** interface.
 Then you need to define the ***getModel*** method to return the classname of the entity as follows:
@@ -78,11 +80,23 @@ class FooRepository extends AbstractRepository implements IRepository{
 	  
 }
 ```
+The repository needs a PDO instance in construction, this can also be done with [Dependency Injection](https://php-di.org/doc/understanding-di.html).
 \
 \
 Finally you can use the methods of the library.
 #
 
+## Demo
+
+A small demo project can be found in the ***[demo/](demo/)*** folder
+
+## Future implementations
+
+- Implementing the ***Composite*** attribute to handle composite primary keys in the entity.
+
+- Implementing the ***ONE_TO_MANY*** relationship.
+
+#
 Copyright 2023 by [Cristian Mannella](http://www.cristianmannella.it)
 
 Released under the [MIT License](LICENSE)
