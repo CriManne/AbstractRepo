@@ -1,1 +1,1 @@
-DROP DATABASE IF EXISTS bookrental_test;
+DROP DATABASE IF EXISTS abstract_repo_test;

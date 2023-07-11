@@ -1,8 +1,8 @@
-DROP DATABASE IF EXISTS bookrental_test;
+DROP DATABASE IF EXISTS abstract_repo_test;
 
-CREATE DATABASE bookrental_test;
+CREATE DATABASE abstract_repo_test;
 
-USE bookrental_test;
+USE abstract_repo_test;
 
 CREATE TABLE T1(
     id int not null AUTO_INCREMENT,
