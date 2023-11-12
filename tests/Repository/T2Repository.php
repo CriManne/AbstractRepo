@@ -12,5 +12,3 @@ class T2Repository extends AbstractRepository implements IRepository{
         return T2::class;
     } 
 }
-
-?>

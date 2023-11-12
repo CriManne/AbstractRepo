@@ -12,5 +12,3 @@ class TestInvalidModelRepository extends AbstractRepository implements IReposito
         return InvalidModel::class;
     } 
 }
-
-?>

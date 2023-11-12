@@ -29,6 +29,14 @@ class AbstractRepositoryTest extends TestCase{
         self::$t2Repo = new T2Repository(self::$pdo);
     }
 
+    public function setUp(): void
+    {
+        self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+        self::$pdo->exec("TRUNCATE TABLE t2;");
+        self::$pdo->exec("TRUNCATE TABLE t1;");
+        self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+    }
+
     public function testInvalidModel():void{   
         $this->expectException(RepositoryException::class);     
         
@@ -50,26 +58,38 @@ class AbstractRepositoryTest extends TestCase{
             $t = new T1($i,"test");
             self::$t1Repo->save($t);
         }
-        $this->assertEquals(count(self::$t1Repo->findAll()),51);
+        $this->assertEquals(count(self::$t1Repo->findAll()),50);
     }
 
     public function testValidModelUpdateAndFindById():void{
         $t1 = new T1(1,"test2");
+
+        self::$t1Repo->save($t1);
+
+        $t1->v1 = "test99";
+
         self::$t1Repo->update($t1);
         
-        $this->assertEquals(self::$t1Repo->findById(1)->v1,'test2');
+        $this->assertEquals(self::$t1Repo->findById(1)->v1,'test99');
     }
 
     public function testValidModelUpdateAndFindByIdWrongId():void{
-        $t1 = new T1(999,"test99");                
+        $t1 = new T1(1,"test99");
+
+        self::$t1Repo->save($t1);
+
+        $t1->id = 999;
+        $t1->v1 = "test99";
+
         self::$t1Repo->update($t1);
+
         $this->assertEquals(self::$t1Repo->findById(999),null);
         $this->assertNotEquals(self::$t1Repo->findById(1),null);
     }
 
     public function testValidModelDeleteAndFindById():void{
         $t1 = new T1(2,"test2");
-        self::$t1Repo->save($t1);        
+        self::$t1Repo->save($t1);
         $this->assertNotEquals(self::$t1Repo->findById($t1->id),null);
         self::$t1Repo->delete($t1->id);
         $this->assertEquals(self::$t1Repo->findById($t1->id),null);
@@ -77,7 +97,7 @@ class AbstractRepositoryTest extends TestCase{
 
     public function testValidRelationalModelSave():void{
         $t1 = new T1(1,"testRelation");
-        self::$t1Repo->update($t1);
+        self::$t1Repo->save($t1);
         $t2 = new T2(1,"test2",$t1);
         self::$t2Repo->save($t2);   
 
@@ -87,12 +107,17 @@ class AbstractRepositoryTest extends TestCase{
     
     public function testInvalidRelationalModelSave():void{
         $this->expectExceptionMessage(RepositoryException::RELATED_OBJECT_NOT_FOUND);
-        $t1 = new T1(2,"test");
+        $t1 = new T1(9999,"test");
         $t2 = new T2(2,"test2",$t1);
         self::$t2Repo->save($t2);   
     }
 
     public function testValidRelationalModelDelete():void{
+        $t1 = new T1(1,"testRelation");
+        self::$t1Repo->save($t1);
+        $t2 = new T2(1,"test2",$t1);
+        self::$t2Repo->save($t2);
+
         self::$t2Repo->delete(1);   
         $this->assertNull(self::$t2Repo->findById(1));
     }
@@ -101,19 +126,23 @@ class AbstractRepositoryTest extends TestCase{
         $this->expectException(RepositoryException::class);
         $t1 = new T1(1,"test");
         $t2 = new T2(2,"test2",$t1);
+        self::$t1Repo->save($t1);
         self::$t2Repo->save($t2); 
-        self::$t1Repo->delete(1);   
+        self::$t1Repo->delete(1);
     }
 
-    public function testValidRelationalModelUpdate():void{        
-        $t1 = new T1(1,"test");
-        $t2 = new T2(4,"test2",$t1);
-        self::$t2Repo->save($t2); 
+    public function testValidRelationalModelUpdate():void{
+        $t1 = new T1(1,"testRelation");
+        self::$t1Repo->save($t1);
+        $t2 = new T2(1,"test2",$t1);
+        self::$t2Repo->save($t2);
 
         $t2->v1 = "testUpdate";
+
         self::$t2Repo->update($t2);
         
-        $this->assertEquals(self::$t2Repo->findById(4)->v1,"testUpdate");
+        $this->assertEquals(self::$t2Repo->findById(1)->v1,"testUpdate");
+        $this->assertEquals(self::$t2Repo->findById(1)->t1->v1,"testRelation");
     }
 
     public function testInvalidRelationalModelUpdate():void{        
