@@ -371,12 +371,12 @@ abstract class AbstractRepository
                 $attributeName = $attribute->getName();
 
                 // If is an identity we are not going to add it in the insert query
-                if ($attributeName == Attributes\Key::class && $attribute->getArguments()[0]) {
+                if ($attributeName == Attributes\Key::class && isset($attribute->getArguments()[0])) {
                     $isIdentity = true;
                 }
 
                 // If is a Attributes\Key not identity or if is required we must insert it
-                if (($attributeName == Attributes\Key::class && !$attribute->getArguments()[0])
+                if (($attributeName == Attributes\Key::class && !isset($attribute->getArguments()[0]))
                     || $attributeName == Attributes\Required::class
                 ) {
                     $isRequired = true;
