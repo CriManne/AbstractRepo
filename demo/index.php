@@ -1,15 +1,17 @@
 <?php
-
-use Demo\Models\Book;
-use Demo\Repository\BookRepository;
-
 declare(strict_types=1);
+
+chdir(dirname(__DIR__));
+require 'vendor/autoload.php';
+
+use Demo\Book;
+use Demo\BookRepository;
 
 $dsn= "define-dsn-here";
 $username = "define-username-here";
 $password = "define-password-here";
 
-$pdo = new PDO($dsn,$username,$password);
+$pdo = new PDO($dsn, $username, $password);
 
 $bookRepo = new BookRepository($pdo);
 
@@ -27,5 +29,4 @@ $bookRepo->update($book);
 
 $bookRepo->delete(1);
 
-?>
 

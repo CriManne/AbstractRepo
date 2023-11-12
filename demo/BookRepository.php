@@ -2,18 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Demo\Repository;
+namespace Demo;
 
 use AbstractRepo\Interfaces\IRepository;
 use AbstractRepo\Repository\AbstractRepository;
 use Demo\Models\Book;
 
-class BookRepository extends AbstractRepository implements IRepository{
-
-
-    static public function getModel():string{
+class BookRepository extends AbstractRepository implements IRepository
+{
+    static public function getModel(): string
+    {
         return Book::class;
     }
-
 }
 
