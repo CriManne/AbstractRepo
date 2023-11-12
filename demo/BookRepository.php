@@ -6,7 +6,7 @@ namespace Demo;
 
 use AbstractRepo\Interfaces\IRepository;
 use AbstractRepo\Repository\AbstractRepository;
-use Demo\Models\Book;
+use Demo\Book;
 
 class BookRepository extends AbstractRepository implements IRepository
 {
