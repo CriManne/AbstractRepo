@@ -10,19 +10,17 @@ use AbstractRepo\Attributes\Required;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity]
-class Book implements IModel{
+class Book implements IModel
+{
     #[Key(false)]
     public int $id;
 
     #[Required]
     public string $val;
 
-    function __construct(int $id,string $val){
+    function __construct(int $id, string $val)
+    {
         $this->id = $id;
         $this->val = $val;
     }
-
 }
-
-
-?>

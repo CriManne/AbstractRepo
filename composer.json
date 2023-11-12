@@ -1,7 +1,7 @@
 {
     "name": "crimanne/abstract-repo",
     "description": "A small, lightweight library for abstracting repositories and avoiding writing a lot of repository logic.",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "license": "MIT",
     "autoload": {
         "psr-4": {            
@@ -20,7 +20,7 @@
         }
     ],
     "require": {
-        "php": "^8.0"
+        "php": "^8.2"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.2"

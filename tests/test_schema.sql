@@ -4,16 +4,16 @@ CREATE DATABASE abstract_repo_test;
 
 USE abstract_repo_test;
 
-CREATE TABLE T1(
+CREATE TABLE `t1`(
     id int not null AUTO_INCREMENT,
     v1 varchar(255) not null,
-    primary key(id)
+    PRIMARY KEY(id)
 );
 
-CREATE TABLE T2(
+CREATE TABLE `t2`(
     id int not null AUTO_INCREMENT,
     v1 varchar(255) not null,
     t1_id int not null,
     primary key(id),
-    constraint fk_t2_1 foreign key (t1_id) references t1(id)
+    constraint fk_t2_1 foreign key (t1_id) references `t1`(id)
 );

@@ -7,8 +7,7 @@ namespace AbstractRepo\Interfaces;
 /**
  * Identify that a class is mapped in the database
  */
-interface IModel{
-    
-}
+interface IModel
+{
 
-?>
+}
