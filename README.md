@@ -46,16 +46,6 @@ To define a primary key, you have to use the ***Key*** attribute on the field. T
 int $ID;
 ...
 ```
-To identify a normal field you must use the ***Required*** attribute if is not null or the ***NotRequired*** attribute if it is null. 
-**Be aware that if a field has no valid attributes it will not be considered by the library.**
-```
-...
-#[Required]
-string $mustBeInserted;
-#[NotRequired]
-?string $canBeNull;
-...
-```
 If you have a foreign key in the entity you can flag it with the ***ForeignKey*** attribute that accepts the ***Relationship*** enum: MANY_TO_ONE, ONE_TO_ONE ( the ONE_TO_MANY relation needs to me implemented ).
 ```
 ...

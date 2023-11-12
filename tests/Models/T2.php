@@ -13,16 +13,11 @@ use AbstractRepo\Interfaces\IModel;
 
 #[Entity]
 class T2 implements IModel{
-    #[Key(false)]
-    public int $id;
-    #[Required]
-    public string $v1;
-    #[ForeignKey(Relationship::MANY_TO_ONE)]
-    public T1 $t1;
-
-    function __construct(int $id,string $v1,T1 $t1){
-        $this->id = $id;
-        $this->v1 = $v1;
-        $this->t1 = $t1;
-    }
+    public function __construct(
+        #[Key(false)]
+        public int $id,
+        public string $v1,
+        #[ForeignKey(Relationship::MANY_TO_ONE)]
+        public T1 $t1
+    ){}
 }

@@ -11,13 +11,9 @@ use AbstractRepo\Interfaces\IModel;
 
 #[Entity]
 class T1 implements IModel{
-    #[Key(false)]
-    public int $id;
-    #[Required]
-    public string $v1;
-
-    function __construct(int $id,string $v1){
-        $this->id = $id;
-        $this->v1 = $v1;
-    }
+    public function __construct(
+        #[Key(false)]
+        public int $id,
+        public string $v1
+    ){}
 }

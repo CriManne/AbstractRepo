@@ -364,23 +364,16 @@ abstract class AbstractRepository
             // Attributes of the property
             $attributes = $reflectionProperty->getAttributes();
 
-            // If the property has no attributes it will be skipped
-            if (count($attributes) == 0) continue;
-
             foreach ($attributes as $attribute) {
                 $attributeName = $attribute->getName();
 
                 // If is an identity we are not going to add it in the insert query
-                if ($attributeName == Attributes\Key::class && isset($attribute->getArguments()[0])) {
+                if ($attributeName == Attributes\Key::class && count($attribute->getArguments()) && $attribute->getArguments()[0]) {
                     $isIdentity = true;
                 }
 
-                // If is a Attributes\Key not identity or if is required we must insert it
-                if (($attributeName == Attributes\Key::class && !isset($attribute->getArguments()[0]))
-                    || $attributeName == Attributes\Required::class
-                ) {
-                    $isRequired = true;
-                }
+                // If it doesn't have a default value and is not a key identity then it's required
+                $isRequired = !$reflectionProperty->hasDefaultValue() && !$isIdentity;
 
                 // We get the ENUM type of Enums/Relationship if it is a foreign Attributes\Key and the eventual column name
                 if ($attributeName == Attributes\ForeignKey::class) {
@@ -427,7 +420,7 @@ abstract class AbstractRepository
 
                 } else {
                     // If it's not a fk just add the value
-                    $value = $reflectionProperty->getValue($model);
+                    $value = $reflectionProperty->getValue($model) ?? $reflectionProperty->getDefaultValue() ?? null;
                 }
 
                 if ($isRequired && empty($value)) {
