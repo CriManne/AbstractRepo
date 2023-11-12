@@ -9,7 +9,8 @@ use AbstractRepo\Exceptions\EnumException;
 /**
  * Identifies the types of FOREIGN KEY relationships
  */
-enum Relationship{
+enum Relationship
+{
     case MANY_TO_ONE;
     case ONE_TO_ONE;
 
@@ -17,13 +18,14 @@ enum Relationship{
      * Return the enum relationships from the string value
      *
      * @param string $val
-     * @throws EnumException If the value passed is not valid as RelationshipException
      * @return Relationship
+     * @throws EnumException If the value passed is not valid as RelationshipException
      */
-    static public function fromString(string $val): Relationship{
-        foreach(self::cases() as $case){
-            if($case->name == $val) return $case;
+    static public function fromString(string $val): Relationship
+    {
+        foreach (self::cases() as $case) {
+            if ($case->name == $val) return $case;
         }
-        throw new EnumException(EnumException::$INVALID_ENUM_VALUE);       
+        throw new EnumException(EnumException::INVALID_ENUM_VALUE);
     }
 }

@@ -86,7 +86,7 @@ class AbstractRepositoryTest extends TestCase{
     }
     
     public function testInvalidRelationalModelSave():void{
-        $this->expectExceptionMessage(RepositoryException::$RELATED_OBJECT_NOT_FOUND);
+        $this->expectExceptionMessage(RepositoryException::RELATED_OBJECT_NOT_FOUND);
         $t1 = new T1(2,"test");
         $t2 = new T2(2,"test2",$t1);
         self::$t2Repo->save($t2);   
@@ -117,7 +117,7 @@ class AbstractRepositoryTest extends TestCase{
     }
 
     public function testInvalidRelationalModelUpdate():void{        
-        $this->expectExceptionMessage(RepositoryException::$RELATED_OBJECT_NOT_FOUND);
+        $this->expectExceptionMessage(RepositoryException::RELATED_OBJECT_NOT_FOUND);
         $t1 = new T1(99,"test");
         $t2 = new T2(4,"test2",$t1);
 
