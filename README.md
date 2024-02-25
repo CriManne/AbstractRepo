@@ -82,8 +82,6 @@ A small demo project can be found in the ***[demo/](demo/)*** folder
 
 ## Future implementations
 
-- Implementing the ***Composite*** attribute to handle composite primary keys in the entity.
-
 - Implementing the ***ONE_TO_MANY*** relationship.
 
 #

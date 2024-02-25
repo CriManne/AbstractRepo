@@ -5,7 +5,9 @@ chdir(dirname(__DIR__));
 require 'vendor/autoload.php';
 
 use Demo\Book;
+use Demo\Author;
 use Demo\BookRepository;
+use Demo\AuthorRepository;
 
 $dsn= "define-dsn-here";
 $username = "define-username-here";
@@ -13,9 +15,25 @@ $password = "define-password-here";
 
 $pdo = new PDO($dsn, $username, $password);
 
-$bookRepo = new BookRepository($pdo);
+$pdo->exec("
+        DROP TABLE IF EXISTS book;
+        DROP TABLE IF EXISTS author;
 
-$book = new Book(1,"Test book");
+        CREATE TABLE author(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL);
+        CREATE TABLE book(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL, author_id INT NOT NULL, FOREIGN KEY (author_id) REFERENCES author (id));"
+);
+
+$bookRepo = new BookRepository($pdo);
+$authRepo = new AuthorRepository($pdo);
+
+$author = new Author(12, "Franco");
+
+$book = new Book(
+    val: "Book1",
+    author: $author
+);
+
+$authRepo->save($author);
 
 $bookRepo->save($book);
 
@@ -29,4 +47,10 @@ $bookRepo->update($book);
 
 $bookRepo->delete(1);
 
+$author->val ="Updated author value";
 
+$authRepo->update($author);
+
+$bookRepo->findAll();
+
+$bookRepo->findById(1);

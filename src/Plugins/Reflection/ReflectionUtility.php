@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Util;
+namespace AbstractRepo\Plugins\Reflection;
 
 use AbstractRepo\Attributes;
 use AbstractRepo\Exceptions;
@@ -25,7 +25,7 @@ final class ReflectionUtility
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      */
-    static public function getKeyProperty(string $modelClass): ReflectionProperty
+    public static function getKeyProperty(string $modelClass): ReflectionProperty
     {
         $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\Key::class);
 
@@ -35,31 +35,13 @@ final class ReflectionUtility
     }
 
     /**
-     * Returns the reflected properties with the attributeAttributes\Key
-     *
-     * @param string $modelClass
-     * @return array
-     * @throws Exceptions\NotImplementedException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
-     */
-    static public function getKeysProperties(string $modelClass): array
-    {
-        $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\Key::class);
-
-        if (count($properties) == 0) throw new Exceptions\ReflectionException("NoAttributes\Key property defined in $modelClass");
-
-        throw new Exceptions\NotImplementedException();
-    }
-
-    /**
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
      * @param string $modelClass
      * @return array
      * @throws ReflectionException
      */
-    static public function getFkProperties(string $modelClass): array
+    public static function getFkProperties(string $modelClass): array
     {
         $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\ForeignKey::class);
         return $properties;
@@ -73,7 +55,7 @@ final class ReflectionUtility
      * @return array
      * @throws ReflectionException
      */
-    static public function getPropertyWithAttribute(string $modelClass, string $attributeClass): array
+    public static function getPropertyWithAttribute(string $modelClass, string $attributeClass): array
     {
 
         $properties = [];
@@ -101,7 +83,7 @@ final class ReflectionUtility
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      */
-    static public function getProperty(string $modelClass, string $propertyName): ReflectionProperty
+    public static function getProperty(string $modelClass, string $propertyName): ReflectionProperty
     {
         $reflectionClass = new ReflectionClass($modelClass);
 
@@ -119,21 +101,21 @@ final class ReflectionUtility
     /**
      * Returns the reflected property with the attribute passed
      *
-     * @param ReflectionClass|ReflectionMethod|ReflectionProperty $reflectedObj
-     * @param string $propertyClass
+     * @param ReflectionClass|ReflectionMethod|ReflectionProperty $reflectionObj
+     * @param string $attributeClass
      * @return ReflectionAttribute|null
      */
-    static public function getAttribute(ReflectionClass|ReflectionMethod|ReflectionProperty $reflectedObj, string $propertyClass): ReflectionAttribute|null
+    public static function getAttribute(ReflectionClass|ReflectionMethod|ReflectionProperty $reflectionObj, string $attributeClass): ReflectionAttribute|null
     {
         // Attributes of the property
-        $attributes = $reflectedObj->getAttributes();
+        $attributes = $reflectionObj->getAttributes();
 
         if (count($attributes) == 0) return null;
 
         foreach ($attributes as $attribute) {
             $attributeName = $attribute->getName();
 
-            if ($attributeName == $propertyClass) {
+            if ($attributeName == $attributeClass) {
                 return $attribute;
             }
         }
@@ -150,7 +132,7 @@ final class ReflectionUtility
      * @return mixed
      * @throws ReflectionException
      */
-    static public function invokeMethodOfClass(string $class, string $methodName, ?object $obj): mixed
+    public static function invokeMethodOfClass(string $class, string $methodName, ?object $obj): mixed
     {
         // Get reflection method getModel
         $method = new ReflectionMethod($class, $methodName);
@@ -166,7 +148,7 @@ final class ReflectionUtility
      * @throws ReflectionException
      * @throws ReflectionException
      */
-    static public function getClassShortName(string $class): string
+    public static function getClassShortName(string $class): string
     {
         $reflectedModel = new ReflectionClass($class);
         return $reflectedModel->getShortName();
@@ -179,7 +161,7 @@ final class ReflectionUtility
      * @param string $interfaceName
      * @return boolean
      */
-    static public function class_implements(string $className, string $interfaceName): bool
+    public static function class_implements(string $className, string $interfaceName): bool
     {
         foreach (class_implements($className) as $interface) {
             if ($interface == $interfaceName) return true;
@@ -196,8 +178,35 @@ final class ReflectionUtility
      * @throws ReflectionException
      * @throws ReflectionException
      */
-    static public function getReflectionClass(string $class): ReflectionClass
+    public static function getReflectionClass(string $class): ReflectionClass
     {
         return new ReflectionClass($class);
+    }
+
+    /**
+     * Returns the table name of a model
+     *
+     * @param ReflectionClass $reflectionClass
+     * @return mixed
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
+     */
+    public static function getTableName(ReflectionClass $reflectionClass): string
+    {
+        // Check if the model handled has the Attributes\Entity attribute
+        $entityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
+
+        // If there is no Attributes\Entity attribute it will trigger an Exceptions\RepositoryException
+        if (is_null($entityProperty)) {
+            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_IS_NOT_ENTITY);
+        }
+
+        $tableName = ReflectionUtility::invokeMethodOfClass(
+            get_class($entityProperty->newInstance()),
+            Attributes\Entity::getTableNameMethod,
+            $entityProperty->newInstance()
+        );
+
+        return $tableName ?? strtolower($reflectionClass->getShortName());
     }
 }

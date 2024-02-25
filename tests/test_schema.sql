@@ -17,3 +17,9 @@ CREATE TABLE `t2`(
     primary key(id),
     constraint fk_t2_1 foreign key (t1_id) references `t1`(id)
 );
+
+CREATE TABLE `t3`(
+     id varchar(255) not null,
+     v1 varchar(255) not null,
+     PRIMARY KEY(id)
+);
