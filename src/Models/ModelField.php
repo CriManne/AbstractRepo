@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+namespace AbstractRepo\Models;
+
+/**
+ * Used to handle model fields
+ */
+final class ModelField
+{
+    public function __construct(
+        public string              $fieldName,
+        public ?string             $fieldType,
+        public mixed               $fieldValue = null
+    )
+    {
+    }
+}

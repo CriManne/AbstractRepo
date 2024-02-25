@@ -8,6 +8,7 @@ use AbstractRepo\Attributes;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Interfaces;
+use AbstractRepo\Models;
 use AbstractRepo\Util;
 use PDO;
 use PDOException;
@@ -30,15 +31,17 @@ abstract class AbstractRepository
     private string $tableName;
 
     /**
-     * @param PDO $pdo The pdo object to use the database
+     * @param PDO $pdo
+     * @throws Exceptions\EnumException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
     function __construct(
-        protected PDO  $pdo
+        protected PDO  $pdo,
+        protected Models\ModelsHandler $modelsHandler
     )
     {
-        // If the repository doesn't implements IRepository it won't have the getModel method
+        // If the repository doesn't implement IRepository it won't have the getModel method
         if (!$this instanceof Interfaces\IRepository) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
 
         // Invoke the method to get the model handled by the repository (ex: Book)
@@ -62,9 +65,9 @@ abstract class AbstractRepository
             $this->tableName = $entityProperty->getArguments()[0];
         }
 
-        // Assign the pdo object
-        $this->pdo = $pdo;
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $this->processModel($this->modelClass);
     }
 
     #region Public methods
@@ -246,34 +249,25 @@ abstract class AbstractRepository
         $fkProperties = Util\ReflectionUtility::getFkProperties($modelClass);
 
         foreach ($fkProperties as $fkProperty) {
-            $columnName = null;
-            $fkAttribute = Util\ReflectionUtility::getAttribute($fkProperty, Attributes\ForeignKey::class);
-            $arguments = $fkAttribute->getArguments();
+            $columnName = $fkProperty->fkColumnName;
 
-            // If the column name is specified in the Attributes\ForeignKey attribute use it
-            if (count($arguments) < 2) {
-                $columnName = strtolower($fkProperty->name);
-            } else {
-                $columnName = $arguments[1];
-            }
             // Removes the id from the object
             $id = $obj[$columnName . "_id"];
             unset($obj[$columnName . "_id"]);
 
-            // Needs the full path of the class of the model (ex: AbstractRepo\Model\User)
-            $reflClass = Util\ReflectionUtility::getReflectionClass($modelClass);
-            $prop = $reflClass->getProperty($fkProperty->name);
-            $fkClass = $prop->getType()->getName();
-
-            $fkObj = $this->findById($id, $fkClass, $columnName);
+            var_dump($fkProperty);
+/*            echo $id;
+            var_dump($fkProperty);
+            die;*/
+            $fkObj = $this->findById($id, $fkProperty->fieldType, $columnName);
 
             if (is_null($fkObj)) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
 
-            $obj[$fkProperty->name] = $fkObj;
+            $obj[$fkProperty->fieldName] = $fkObj;
         }
 
         try {
-            $mappedObj = Util\ORM::getNewInstance($modelClass, (array)$obj);
+            $mappedObj = Models\ORM::getNewInstance($modelClass, (array)$obj);
         } catch (Exceptions\ORMException $ex) {
             throw new Exceptions\RepositoryException($ex->getMessage());
         }
@@ -286,70 +280,23 @@ abstract class AbstractRepository
     #region Private methods
 
     /**
-     * Returns the PDOStatement for the insert operation
+     * Analyze the model class and returns the fields of the model
      *
-     * @param Interfaces\IModel $model
-     * @param PDO $pdo
-     * @return PDOStatement
+     * @param string $modelClass
+     * @return Models\FieldInfo[]
      * @throws Exceptions\EnumException
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
      * @throws ReflectionException
      */
-    private function getInsertStatement(Interfaces\IModel $model, PDO $pdo): PDOStatement
+    private function processModel(string $modelClass): void
     {
-        $query = "INSERT INTO $this->tableName";
-
-        // Get the values array to get each value from the model
-        $values = $this->getValuesFromModel($model);
-
-        if (count($values) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
-        }
-
-        // Get an array with just the columns names
-        $columns = array_map(
-            function (Util\ModelField $val) {
-                return $val->fieldName;
-            },
-            $values
-        );
-
-        // Creates the second part of the query (ex: (col1,col2) VALUES ( :col1,:col2))
-        $query .= " ( " . implode(",", $columns) . " ) VALUES (" . implode(",", array_map(function ($val) {
-                return ":$val";
-            }, $columns)) . ");";
-
-        $stmt = $pdo->prepare($query);
-
-        // For each placeholder (:colName) bind the param with its type
-        $stmt = $this->bindValues($values, $stmt);
-
-        return $stmt;
-    }
-
-    /**
-     * Returns an array used in the insert an update operation to get every value of the object
-     *
-     * @param Interfaces\IModel $model
-     * @return array
-     * @throws Exceptions\EnumException
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     */
-    private function getValuesFromModel(Interfaces\IModel $model): array
-    {
-        $classModel = get_class($model);
-
-        $reflectionClass = Util\ReflectionUtility::getReflectionClass($classModel);
+        $reflectionClass = Util\ReflectionUtility::getReflectionClass($modelClass);
 
         $reflectionProperties = $reflectionClass->getProperties();
 
-        $values = [];
+        $fields = [];
 
         foreach ($reflectionProperties as $reflectionProperty) {
-            // Flag to see if a property is identity so it doesn't need to be inserted
+            // Flag to see if a property is identity, so it doesn't need to be inserted
             $isIdentity = false;
 
             // Flag to check if is required
@@ -389,29 +336,106 @@ abstract class AbstractRepository
             $propertyName = $reflectionProperty->getName();
             $propertyType = strval($reflectionProperty->getType());
 
+            $fields[$propertyName] = new Models\FieldInfo(
+                fieldName: $propertyName,
+                fieldType: $propertyType,
+                isRequired: $isRequired,
+                isIdentity: $isIdentity,
+                isFk: $typeOfFk !== null,
+                defaultValue: $reflectionProperty->getDefaultValue(),
+                fkType: $typeOfFk,
+                fkColumnName: $fkColumnName
+            );
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Returns the PDOStatement for the insert operation
+     *
+     * @param Interfaces\IModel $model
+     * @param PDO $pdo
+     * @return PDOStatement
+     * @throws Exceptions\EnumException
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
+     * @throws ReflectionException
+     */
+    private function getInsertStatement(Interfaces\IModel $model, PDO $pdo): PDOStatement
+    {
+        $query = "INSERT INTO $this->tableName";
+
+        // Get the values array to get each value from the model
+        $values = $this->getValuesFromModel($model);
+
+        if (count($values) == 0) {
+            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
+        }
+
+        // Get an array with just the columns names
+        $columns = array_map(
+            function (Models\ModelField $val) {
+                return $val->fieldName;
+            },
+            $values
+        );
+
+        // Creates the second part of the query (ex: (col1,col2) VALUES ( :col1,:col2))
+        $query .= " ( " . implode(",", $columns) . " ) VALUES (" . implode(",", array_map(function ($val) {
+                return ":$val";
+            }, $columns)) . ");";
+
+        $stmt = $pdo->prepare($query);
+
+        // For each placeholder (:colName) bind the param with its type
+        $stmt = $this->bindValues($values, $stmt);
+
+        return $stmt;
+    }
+
+    /**
+     * Returns an array used in the insert an update operation to get every value of the object
+     *
+     * @param Interfaces\IModel $model
+     * @return array
+     * @throws Exceptions\EnumException
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
+     */
+    private function getValuesFromModel(Interfaces\IModel $model): array
+    {
+        $values = [];
+
+        foreach ($model as $propertyName => $value) {
+            $field = $this->getField($propertyName);
+
+            $propertyType = $field->fieldType;
+
             // If it's not an identity
-            if (!$isIdentity) {
+            if (!$field->isIdentity) {
 
                 // If is a fk
-                if ($typeOfFk != null) {
+                if ($field->fkType !== null) {
 
                     // Handle the MANY_TO_ONE relation
-                    if ($typeOfFk == Enums\Relationship::MANY_TO_ONE || $typeOfFk == Enums\Relationship::ONE_TO_ONE) {
+                    if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model
-                        $fkKeyPropertyRefl = Util\ReflectionUtility::getKeyProperty($propertyType);
+                        $fkKeyPropertyRefl = Util\ReflectionUtility::getKeyProperty($field->fieldType);
                         $fkKeyProperty = $fkKeyPropertyRefl->name;
                         $value = $model->$propertyName->$fkKeyProperty;
 
                         // Check if the ID is valid and therefore if there is a related record in the database                                             
-                        $fkObj = $this->findById($value, $propertyType, $propertyName);
+                        $fkObj = $this->findById($value, $field->fieldType, $propertyName);
 
                         if (is_null($fkObj)) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
 
                         $propertyType = strval($fkKeyPropertyRefl->getType());
 
                         // If the column name is specified in the Attributes\ForeignKey attribute use it
-                        if (!is_null($fkColumnName)) {
-                            $propertyName = $fkColumnName;
+                        if (!is_null($field->fkColumnName)) {
+                            $propertyName = $field->fkColumnName;
                         }
 
                         // Get the fk column
@@ -420,11 +444,11 @@ abstract class AbstractRepository
 
                 } else {
                     // If it's not a fk just add the value
-                    $value = $reflectionProperty->getValue($model) ?? $reflectionProperty->getDefaultValue() ?? null;
+                    $value = $value ?? $field->defaultValue ?? null;
                 }
 
-                if ($isRequired && empty($value)) {
-                    throw new Exceptions\RepositoryException("$propertyName is required!");
+                if ($field->isRequired && empty($value)) {
+                    throw new Exceptions\RepositoryException("{$propertyName} is required!");
                 }
 
                 if (empty($value)) {
@@ -432,9 +456,14 @@ abstract class AbstractRepository
                 }
 
                 // Array to store all the information to create the insert
-                $values[] = new Util\ModelField($propertyName, $propertyType, $value);
+                $values[] = new Models\ModelField(
+                    fieldName: $propertyName,
+                    fieldType: $propertyType,
+                    fieldValue: $value
+                );
             }
         }
+
 
         return $values;
     }
@@ -464,7 +493,7 @@ abstract class AbstractRepository
 
         // Get the update string (ex: col1 = :col1, col2 = :col2)
         $columns = array_map(
-            function (Util\ModelField $val) {
+            function (Models\ModelField $val) {
                 return $val->fieldName . " = :" . $val->fieldName;
             },
             $values
@@ -514,7 +543,7 @@ abstract class AbstractRepository
     /**
      * Bind the values in the array passed to the statement received
      *
-     * @param Util\ModelField[] $values
+     * @param Models\ModelField[] $values
      * @param PDOStatement $stmt
      * @return PDOStatement
      */
