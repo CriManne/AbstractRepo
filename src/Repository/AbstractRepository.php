@@ -7,12 +7,18 @@ namespace AbstractRepo\Repository;
 use AbstractRepo\Attributes;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Interfaces;
+use AbstractRepo\Interfaces\IModel;
 use AbstractRepo\Models;
-use AbstractRepo\Util;
+use AbstractRepo\Plugins\ORM\ORM;
+use AbstractRepo\Plugins\PDO\PDOUtil;
+use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
+use AbstractRepo\Plugins\Reflection\ReflectionUtility;
 use PDO;
 use PDOException;
 use PDOStatement;
+use ReflectionClass;
 use ReflectionException;
 
 /**
@@ -20,6 +26,8 @@ use ReflectionException;
  */
 abstract class AbstractRepository
 {
+    private const FK_COLUMN_ID_SUFFIX = '_id';
+
     /**
      * @var string|mixed The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
      */
@@ -31,269 +39,56 @@ abstract class AbstractRepository
     private string $tableName;
 
     /**
+     * @var Models\ModelHandler The models handler
+     */
+    private Models\ModelHandler $modelHandler;
+
+    /**
      * @param PDO $pdo
-     * @throws Exceptions\EnumException
-     * @throws Exceptions\RepositoryException
      * @throws ReflectionException
+     * @throws RepositoryException
      */
     function __construct(
-        protected PDO  $pdo,
-        protected Models\ModelsHandler $modelsHandler
+        protected PDO $pdo
     )
     {
         // If the repository doesn't implement IRepository it won't have the getModel method
-        if (!$this instanceof Interfaces\IRepository) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+        if (!$this instanceof Interfaces\IRepository) {
+            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+        }
 
         // Invoke the method to get the model handled by the repository (ex: Book)
-        $this->modelClass = Util\ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
+        $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
+
+        $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
 
         // Check if the class implements Interfaces\IModel
-        if (!Util\ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class))
+        if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
-
-        // Check if the model handled has the Attributes\Entity attribute
-        $entityProperty = Util\ReflectionUtility::getAttribute(Util\ReflectionUtility::getReflectionClass($this->modelClass), Attributes\Entity::class);
-
-        // If there is not Attributes\Entity attribute it will trigger a Exceptions\RepositoryException
-        if (is_null($entityProperty)) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_IS_NOT_ENTITY);
-
-        // If there is no table name specified in the constructor of the Attributes\Entity attribute 
-        // it will take the name of the model class
-        if (count($entityProperty->getArguments()) == 0) {
-            $this->tableName = strtolower(Util\ReflectionUtility::getClassShortName($this->modelClass));
-        } else {
-            $this->tableName = $entityProperty->getArguments()[0];
         }
+
+        $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
 
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $this->processModel($this->modelClass);
+        $this->modelHandler = new Models\ModelHandler();
+
+        // Process the model
+        $this->processModel($modelReflectionClass);
     }
-
-    #region Public methods
-
-    /**
-     * Entry function to findAll models
-     *
-     * @return array|null
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     */
-    public function findAll(): ?array
-    {
-
-        $query = "SELECT * FROM {$this->tableName}";
-        $stmt = $this->pdo->query($query);
-        $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
-        $mappedArr = [];
-
-        foreach ($arr as $item) {
-            $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
-        }
-
-        return $mappedArr;
-    }
-
-
-    /**
-     * Entry function to find by id a Model
-     * @param $id
-     * @param string|null $class
-     * @param string|null $table
-     * @return Interfaces\IModel|null
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not configured properly
-     * @throws ReflectionException
-     */
-    public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
-    {
-        // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
-        // called with different modelClasses and tableNames
-        $modelClass = $class ?? $this->modelClass;
-        $tableName = $table ?? $this->tableName;
-
-        // Get the Attributes\Key property of the model
-        $keyProperty = Util\ReflectionUtility::getKeyProperty($modelClass);
-
-        // Get the name of the Attributes\Key
-        $propertyName = $keyProperty->getName();
-
-        $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
-
-        if (count($res) == 0) return null;
-
-        if (count($res) > 1) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::FETCH_BY_ID_MULTIPLE_RESULTS);
-
-        return $res[0];
-    }
-
-    /**
-     * Make a filtered select with the parameter passed
-     *
-     * @param string $tableName
-     * @param string $modelClass
-     * @param string $property
-     * @param $value
-     * @return array|null
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     */
-    private function findWhere(string $tableName, string $modelClass, string $property, $value): ?array
-    {
-
-        $query = "SELECT * FROM {$tableName} WHERE ";
-        // Get the Attributes\Key property of the model
-        $property = Util\ReflectionUtility::getProperty($modelClass, $property);
-
-        // Get the name of the Attributes\Key
-        $propertyName = $property->getName();
-
-        // Get the PDO type of the property
-        $idType = $this->getPDOType(strval($property->getType()));
-
-        // Creates the where condition (ex: WHERE ID = :ID)
-        $placeholder = ":$propertyName";
-        $query .= "$propertyName = $placeholder";
-
-        // Prepares, binds, executes and fetch the query
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam($placeholder, $value, $idType);
-        $stmt->execute();
-        $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
-
-        $mappedArr = [];
-
-        foreach ($arr as $item) {
-            $mappedArr[] = $this->getMappedObject((array)$item, $modelClass);
-        }
-
-        return $mappedArr;
-    }
-
-    /**
-     * Entry function to save a Model
-     *
-     * @param Interfaces\IModel $model
-     * @return void
-     * @throws Exceptions\EnumException
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the database triggers an exception
-     * @throws ReflectionException
-     */
-    public function save(Interfaces\IModel $model): void
-    {
-        try {
-            $stmt = $this->getInsertStatement($model, $this->pdo);
-            $stmt->execute();
-        } catch (PDOException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-    }
-
-    /**
-     * Entry function to update a Model
-     *
-     * @param Interfaces\IModel $model
-     * @return void
-     * @throws Exceptions\EnumException
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the database triggers an exception
-     * @throws ReflectionException
-     */
-    public function update(Interfaces\IModel $model): void
-    {
-        try {
-            $stmt = $this->getUpdateStatement($model, $this->pdo);
-            $stmt->execute();
-        } catch (PDOException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-    }
-
-    /**
-     * Entry function to delete a Model
-     *
-     * @param $id
-     * @return void
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     */
-    public function delete($id): void
-    {
-        try {
-            $stmt = $this->getDeleteStatement($id, $this->pdo);
-            $stmt->execute();
-        } catch (PDOException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-    }
-
-    /**
-     * Returns the instance model from the array gave by the database
-     * It handles the foreign Attributes\Keys with the
-     *
-     * @param mixed $obj
-     * @param string $modelClass
-     * @return Interfaces\IModel|null
-     * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the related object is not found or if the orm mapping triggers an exception
-     * @throws ReflectionException
-     */
-    public function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
-    {
-        if (!isset($obj) || !$obj) return null;
-
-        $fkProperties = Util\ReflectionUtility::getFkProperties($modelClass);
-
-        foreach ($fkProperties as $fkProperty) {
-            $columnName = $fkProperty->fkColumnName;
-
-            // Removes the id from the object
-            $id = $obj[$columnName . "_id"];
-            unset($obj[$columnName . "_id"]);
-
-            var_dump($fkProperty);
-/*            echo $id;
-            var_dump($fkProperty);
-            die;*/
-            $fkObj = $this->findById($id, $fkProperty->fieldType, $columnName);
-
-            if (is_null($fkObj)) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
-
-            $obj[$fkProperty->fieldName] = $fkObj;
-        }
-
-        try {
-            $mappedObj = Models\ORM::getNewInstance($modelClass, (array)$obj);
-        } catch (Exceptions\ORMException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-
-        return $mappedObj;
-    }
-
-    #endregion
 
     #region Private methods
 
     /**
-     * Analyze the model class and returns the fields of the model
+     * Analyze the model class
      *
-     * @param string $modelClass
-     * @return Models\FieldInfo[]
-     * @throws Exceptions\EnumException
+     * @param ReflectionClass $reflectionClass
+     * @return void
      * @throws ReflectionException
      */
-    private function processModel(string $modelClass): void
+    private function processModel(ReflectionClass $reflectionClass): void
     {
-        $reflectionClass = Util\ReflectionUtility::getReflectionClass($modelClass);
-
         $reflectionProperties = $reflectionClass->getProperties();
-
-        $fields = [];
 
         foreach ($reflectionProperties as $reflectionProperty) {
             // Flag to see if a property is identity, so it doesn't need to be inserted
@@ -312,22 +107,37 @@ abstract class AbstractRepository
             $attributes = $reflectionProperty->getAttributes();
 
             foreach ($attributes as $attribute) {
+                $attributeInstance = $attribute->newInstance();
                 $attributeName = $attribute->getName();
 
                 // If is an identity we are not going to add it in the insert query
-                if ($attributeName == Attributes\Key::class && count($attribute->getArguments()) && $attribute->getArguments()[0]) {
-                    $isIdentity = true;
+                if ($attributeName === Attributes\Key::class) {
+                    $isIdentity = ReflectionUtility::invokeMethodOfClass(
+                        get_class($attributeInstance),
+                        Attributes\Key::isIdentityMethod,
+                        $attributeInstance
+                    );
                 }
 
                 // If it doesn't have a default value and is not a key identity then it's required
                 $isRequired = !$reflectionProperty->hasDefaultValue() && !$isIdentity;
 
-                // We get the ENUM type of Enums/Relationship if it is a foreign Attributes\Key and the eventual column name
-                if ($attributeName == Attributes\ForeignKey::class) {
-                    $arguments = $attribute->getArguments();
-                    $typeOfFk = Enums\Relationship::fromString($arguments[0]->name);
-                    if (count($arguments) > 1) {
-                        $fkColumnName = $arguments[1];
+                // We get the ENUM type of Enums/Relationship if it is a foreign key and the column name
+                if ($attributeName === Attributes\ForeignKey::class) {
+                    $typeOfFk = ReflectionUtility::invokeMethodOfClass(
+                        get_class($attributeInstance),
+                        Attributes\ForeignKey::getRelationshipMethod,
+                        $attributeInstance
+                    );
+
+                    $fkColumnName = ReflectionUtility::invokeMethodOfClass(
+                        get_class($attributeInstance),
+                        Attributes\ForeignKey::getColumnNameMethod,
+                        $attributeInstance
+                    );
+
+                    if (!$fkColumnName) {
+                        $fkColumnName = strtolower($reflectionProperty->getName()) . self::FK_COLUMN_ID_SUFFIX;
                     }
                 }
             }
@@ -336,35 +146,48 @@ abstract class AbstractRepository
             $propertyName = $reflectionProperty->getName();
             $propertyType = strval($reflectionProperty->getType());
 
-            $fields[$propertyName] = new Models\FieldInfo(
+            $this->modelHandler->save(
                 fieldName: $propertyName,
-                fieldType: $propertyType,
-                isRequired: $isRequired,
-                isIdentity: $isIdentity,
-                isFk: $typeOfFk !== null,
-                defaultValue: $reflectionProperty->getDefaultValue(),
-                fkType: $typeOfFk,
-                fkColumnName: $fkColumnName
+                fieldInfo: new Models\FieldInfo(
+                    fieldName: $propertyName,
+                    fieldType: $propertyType,
+                    isRequired: $isRequired,
+                    isIdentity: $isIdentity,
+                    isFk: $typeOfFk !== null,
+                    defaultValue: $reflectionProperty->getDefaultValue(),
+                    fkType: $typeOfFk,
+                    fkColumnName: $fkColumnName
+                )
             );
         }
+    }
 
-        return $fields;
+    /**
+     * Validates the model sent in the request
+     *
+     * @param IModel $model
+     * @return void
+     * @throws RepositoryException
+     */
+    private function validateRequest(Interfaces\IModel $model): void
+    {
+        if (get_class($model) !== $this->modelClass) {
+            throw new Exceptions\RepositoryException("The model is not handled by the repository.");
+        }
     }
 
     /**
      * Returns the PDOStatement for the insert operation
      *
-     * @param Interfaces\IModel $model
-     * @param PDO $pdo
+     * @param IModel $model
      * @return PDOStatement
-     * @throws Exceptions\EnumException
      * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
      * @throws ReflectionException
+     * @throws RepositoryException If the model has no valid fields to take the data from
      */
-    private function getInsertStatement(Interfaces\IModel $model, PDO $pdo): PDOStatement
+    private function getInsertStatement(Interfaces\IModel $model): PDOStatement
     {
-        $query = "INSERT INTO $this->tableName";
+        $queryBuilder = new QueryBuilder();
 
         // Get the values array to get each value from the model
         $values = $this->getValuesFromModel($model);
@@ -374,22 +197,78 @@ abstract class AbstractRepository
         }
 
         // Get an array with just the columns names
-        $columns = array_map(
-            function (Models\ModelField $val) {
-                return $val->fieldName;
-            },
-            $values
-        );
+        $columns = array_map(fn(Models\ModelField $val) => $val->fieldName, $values);
 
-        // Creates the second part of the query (ex: (col1,col2) VALUES ( :col1,:col2))
-        $query .= " ( " . implode(",", $columns) . " ) VALUES (" . implode(",", array_map(function ($val) {
-                return ":$val";
-            }, $columns)) . ");";
+        $queryBuilder->insert($this->tableName, $columns);
 
-        $stmt = $pdo->prepare($query);
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
         // For each placeholder (:colName) bind the param with its type
         $stmt = $this->bindValues($values, $stmt);
+
+        return $stmt;
+    }
+
+    /**
+     * Returns the PDOStatement for the update operation
+     *
+     * @param IModel $model
+     * @return PDOStatement
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     * @throws RepositoryException If the model has no valid fields to take the data from
+     */
+    private function getUpdateStatement(Interfaces\IModel $model): PDOStatement
+    {
+        $queryBuilder = new QueryBuilder();
+
+        // Get the values array to get each value from the model
+        $values = $this->getValuesFromModel($model);
+
+        if (count($values) == 0) {
+            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
+        }
+
+        // Get the update string (ex: col1 = :col1, col2 = :col2)
+        $columns = array_map(fn(Models\ModelField $val) => $val->fieldName, $values);
+
+        $queryBuilder->update($this->tableName, $columns);
+
+        $keyProp = ReflectionUtility::getKeyProperty($model::class);
+        $keyPropName = $keyProp->name;
+        $keyPropValue = $keyProp->getValue($model);
+
+        $queryBuilder->where("{$keyPropName} = {$keyPropValue}");
+
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+        // Bind values to the statement
+        $stmt = $this->bindValues($values, $stmt);
+
+        return $stmt;
+    }
+
+    /**
+     * Returns the PDOStatement for the delete operation
+     *
+     * @param $id
+     * @return PDOStatement
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    private function getDeleteStatement($id): PDOStatement
+    {
+        $queryBuilder = new QueryBuilder();
+
+        $keyProp = ReflectionUtility::getKeyProperty($this->modelClass);
+        $keyPropName = $keyProp->name;
+        $keyPropValue = $id;
+
+        $queryBuilder
+            ->delete($this->tableName)
+            ->where("{$keyPropName} = {$keyPropValue}");
+
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
         return $stmt;
     }
@@ -399,7 +278,6 @@ abstract class AbstractRepository
      *
      * @param Interfaces\IModel $model
      * @return array
-     * @throws Exceptions\EnumException
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
@@ -409,7 +287,7 @@ abstract class AbstractRepository
         $values = [];
 
         foreach ($model as $propertyName => $value) {
-            $field = $this->getField($propertyName);
+            $field = $this->modelHandler->get($propertyName);
 
             $propertyType = $field->fieldType;
 
@@ -419,17 +297,18 @@ abstract class AbstractRepository
                 // If is a fk
                 if ($field->fkType !== null) {
 
-                    // Handle the MANY_TO_ONE relation
                     if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model
-                        $fkKeyPropertyRefl = Util\ReflectionUtility::getKeyProperty($field->fieldType);
+                        $fkKeyPropertyRefl = ReflectionUtility::getKeyProperty($field->fieldType);
                         $fkKeyProperty = $fkKeyPropertyRefl->name;
                         $value = $model->$propertyName->$fkKeyProperty;
 
-                        // Check if the ID is valid and therefore if there is a related record in the database                                             
+                        // Check if the ID is valid and therefore if there is a related record in the database
                         $fkObj = $this->findById($value, $field->fieldType, $propertyName);
 
-                        if (is_null($fkObj)) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                        if (!$fkObj) {
+                            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                        }
 
                         $propertyType = strval($fkKeyPropertyRefl->getType());
 
@@ -437,9 +316,6 @@ abstract class AbstractRepository
                         if (!is_null($field->fkColumnName)) {
                             $propertyName = $field->fkColumnName;
                         }
-
-                        // Get the fk column
-                        $propertyName .= "_id";
                     }
 
                 } else {
@@ -463,81 +339,103 @@ abstract class AbstractRepository
                 );
             }
         }
-
-
         return $values;
     }
 
     /**
-     * Returns the PDOStatement for the update operation
+     * Make a filtered select with the parameter passed
      *
-     * @param Interfaces\IModel $model
-     * @param PDO $pdo
-     * @return PDOStatement
-     * @throws Exceptions\EnumException
+     * @param string $tableName
+     * @param string $modelClass
+     * @param string $property
+     * @param $value
+     * @return array|null
      * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
+     * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
-    private function getUpdateStatement(Interfaces\IModel $model, PDO $pdo): PDOStatement
+    private function findWhere(string $tableName, string $modelClass, string $property, $value): ?array
     {
+        $queryBuilder = (new QueryBuilder())
+            ->select()
+            ->from($tableName);
 
-        $query = "UPDATE {$this->tableName} SET ";
+        // Get the Attributes\Key property of the model
+        $property = ReflectionUtility::getProperty($modelClass, $property);
 
-        // Get the values array to get each value from the model
-        $values = $this->getValuesFromModel($model);
+        // Get the name of the Attributes\Key
+        $propertyName = $property->getName();
 
-        if (count($values) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
+        // Get the PDO type of the property
+        $idType = PDOUtil::getPDOType(strval($property->getType()));
+
+        $queryBuilder->where("{$propertyName} = " . QueryBuilder::BIND_CHAR . "{$propertyName}");
+
+        // Prepares, binds, executes and fetch the query
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+        $stmt->bindParam(QueryBuilder::BIND_CHAR . $propertyName, $value, $idType);
+        $stmt->execute();
+        $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
+
+        $mappedArr = [];
+
+        foreach ($arr as $item) {
+            $mappedArr[] = $this->getMappedObject((array)$item, $modelClass);
         }
 
-        // Get the update string (ex: col1 = :col1, col2 = :col2)
-        $columns = array_map(
-            function (Models\ModelField $val) {
-                return $val->fieldName . " = :" . $val->fieldName;
-            },
-            $values
-        );
-
-        $query .= implode(",", $columns);
-
-        $keyProp = Util\ReflectionUtility::getKeyProperty($model::class);
-        $keyPropName = $keyProp->name;
-        $keyPropValue = $keyProp->getValue($model);
-
-        $query .= " WHERE $keyPropName = $keyPropValue";
-
-        $stmt = $pdo->prepare($query);
-
-        // Bind values to the statement
-        $stmt = $this->bindValues($values, $stmt);
-
-        return $stmt;
+        return $mappedArr;
     }
 
     /**
-     * Returns the PDOStatement for the delete operation
+     * Returns the instance model from the array gave by the database
+     * It handles the foreign Attributes\Keys with the
      *
-     * @param $id
-     * @param PDO $pdo
-     * @return PDOStatement
+     * @param mixed $obj
+     * @param string $modelClass
+     * @return Interfaces\IModel|null
      * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException If the related object is not found or if the orm mapping triggers an exception
      * @throws ReflectionException
      */
-    private function getDeleteStatement($id, PDO $pdo): PDOStatement
+    private function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
     {
+        if (!isset($obj) || !$obj) return null;
 
-        $query = "DELETE FROM {$this->tableName} WHERE ";
+        $fkProperties = ReflectionUtility::getFkProperties(modelClass: $modelClass);
 
-        $keyProp = Util\ReflectionUtility::getKeyProperty($this->modelClass);
-        $keyPropName = $keyProp->name;
-        $keyPropValue = $id;
+        foreach ($fkProperties as $fkProperty) {
+            $fkField = $this->modelHandler->get(fieldName: $fkProperty->name);
 
-        $query .= " $keyPropName = $keyPropValue";
+            $columnName = $fkField->fkColumnName;
 
-        $stmt = $pdo->prepare($query);
+            $fkReflClass = ReflectionUtility::getReflectionClass(class: $fkField->fieldType);
 
-        return $stmt;
+            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $fkReflClass);
+
+            // Removes the id from the object
+            $id = $obj[$columnName];
+            unset($obj[$columnName]);
+
+            $fkObj = $this->findById(
+                id: $id,
+                class: $fkField->fieldType,
+                table: $fkTableName
+            );
+
+            if (is_null($fkObj)) {
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+            }
+
+            $obj[$fkField->fieldName] = $fkObj;
+        }
+
+        try {
+            $mappedObj = ORM::getNewInstance($modelClass, (array)$obj);
+        } catch (Exceptions\ORMException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
+
+        return $mappedObj;
     }
 
     /**
@@ -550,10 +448,9 @@ abstract class AbstractRepository
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
     {
         foreach ($values as $val) {
+            $type = PDOUtil::getPDOType($val->fieldType);
 
-            $type = $this->getPDOType($val->fieldType);
-
-            $placeholder = ":" . $val->fieldName;
+            $placeholder = QueryBuilder::BIND_CHAR . $val->fieldName;
             $value = $val->fieldValue;
 
             $stmt->bindValue($placeholder, $value, $type);
@@ -561,19 +458,129 @@ abstract class AbstractRepository
         return $stmt;
     }
 
+    #endregion
+
+    #region Public methods
+
     /**
-     * Returns the PDO type from the PHP type
+     * Entry function to findAll models
      *
-     * @param string $type
-     * @return ?int
+     * @return array|null
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
      */
-    private function getPDOType(string $type): ?int
+    public function findAll(): ?array
     {
-        return match ($type) {
-            'int', '?int' => PDO::PARAM_INT,
-            '?string', 'string' => PDO::PARAM_STR,
-            default => null,
-        };
+        $queryBuilder = (new QueryBuilder())
+            ->select()
+            ->from($this->tableName);
+
+        $stmt = $this->pdo->query($queryBuilder->getQuery());
+        $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
+        $mappedArr = [];
+
+        foreach ($arr as $item) {
+            $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
+        }
+
+        return $mappedArr;
+    }
+
+    /**
+     * Entry function to find by id a Model
+     * @param $id
+     * @param string|null $class
+     * @param string|null $table
+     * @return Interfaces\IModel|null
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not configured properly
+     * @throws ReflectionException
+     */
+    public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
+    {
+        // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
+        // called with different modelClasses and tableNames
+        $modelClass = $class ?? $this->modelClass;
+        $tableName = $table ?? $this->tableName;
+
+        // Get the Attributes\Key property of the model
+        $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
+
+        // Get the name of the Attributes\Key
+        $propertyName = $keyProperty->getName();
+
+        $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
+
+        if (count($res) == 0) return null;
+
+        if (count($res) > 1) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::FETCH_BY_ID_MULTIPLE_RESULTS);
+
+        return $res[0];
+    }
+
+    /**
+     * Entry function to save a Model
+     *
+     * @param Interfaces\IModel $model
+     * @return void
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException If the database triggers an exception
+     * @throws ReflectionException
+     */
+    public function save(Interfaces\IModel $model): void
+    {
+        try {
+            $this->validateRequest($model);
+
+            $stmt = $this->getInsertStatement($model);
+            $stmt->execute();
+
+            // Set id to the saved model
+            ReflectionUtility::getKeyProperty($this->modelClass)->setValue($model, $this->pdo->lastInsertId());
+        } catch (PDOException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
+    }
+
+    /**
+     * Entry function to update a Model
+     *
+     * @param Interfaces\IModel $model
+     * @return void
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException If the database triggers an exception
+     * @throws ReflectionException
+     */
+    public function update(Interfaces\IModel $model): void
+    {
+        try {
+            $this->validateRequest($model);
+
+            $stmt = $this->getUpdateStatement($model);
+            $stmt->execute();
+        } catch (PDOException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
+    }
+
+    /**
+     * Entry function to delete a Model
+     *
+     * @param $id
+     * @return void
+     * @throws Exceptions\ReflectionException
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
+     */
+    public function delete($id): void
+    {
+        try {
+            $stmt = $this->getDeleteStatement($id);
+            $stmt->execute();
+        } catch (PDOException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
     }
     #endregion
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Util;
+namespace AbstractRepo\Plugins\ORM;
 
 use AbstractRepo\Exceptions;
 use AbstractRepo\Interfaces;

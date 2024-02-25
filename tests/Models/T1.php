@@ -6,7 +6,6 @@ namespace AbstractRepo\Test\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\Key;
-use AbstractRepo\Attributes\Required;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity]

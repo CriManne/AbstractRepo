@@ -7,6 +7,7 @@ namespace AbstractRepo\Test\Repository;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Models\T1;
 use AbstractRepo\Test\Models\T2;
+use AbstractRepo\Test\Models\T3;
 use PHPUnit\Framework\TestCase;
 use PDO;
 
@@ -20,6 +21,7 @@ class AbstractRepositoryTest extends TestCase{
 
     public static T1Repository $t1Repo;
     public static T2Repository $t2Repo;
+    public static T3Repository $t3Repo;
 
     public static function setUpBeforeClass():void
     {
@@ -27,6 +29,7 @@ class AbstractRepositoryTest extends TestCase{
         self::$pdo->exec(file_get_contents('./tests/test_schema.sql'));
         self::$t1Repo = new T1Repository(self::$pdo);
         self::$t2Repo = new T2Repository(self::$pdo);
+        self::$t3Repo = new T3Repository(self::$pdo);
     }
 
     public function setUp(): void
@@ -34,6 +37,7 @@ class AbstractRepositoryTest extends TestCase{
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
         self::$pdo->exec("TRUNCATE TABLE t2;");
         self::$pdo->exec("TRUNCATE TABLE t1;");
+        self::$pdo->exec("TRUNCATE TABLE t3;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
@@ -47,6 +51,12 @@ class AbstractRepositoryTest extends TestCase{
         $t1 = new T1(1,"test");
         self::$t1Repo->save($t1);
         $this->assertEquals(self::$t1Repo->findById(1)->v1,'test');
+    }
+
+    public function testValidModelSaveAndFindByIdString():void{
+        $t3 = new T3("ABC","testt3");
+        self::$t3Repo->save($t3);
+        $this->assertEquals(self::$t3Repo->findById("ABC")->v1,'testt3');
     }
 
     public function testValidModelSaveAndFindByIdWrongId():void{        

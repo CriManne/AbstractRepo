@@ -5,20 +5,16 @@ declare(strict_types=1);
 namespace Demo;
 
 use AbstractRepo\Attributes\Entity;
-use AbstractRepo\Attributes\ForeignKey;
 use AbstractRepo\Attributes\Key;
-use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity]
-class Book implements IModel
+class Author implements IModel
 {
     function __construct(
+        #[Key(false)]
+        public int    $id,
         public string $val,
-        #[ForeignKey(Relationship::MANY_TO_ONE)]
-        public Author $author,
-        #[Key(true)]
-        public ?int   $id = null
     )
     {
     }
