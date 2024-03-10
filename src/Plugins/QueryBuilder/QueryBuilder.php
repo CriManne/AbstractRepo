@@ -61,6 +61,15 @@ class QueryBuilder
         return $this;
     }
 
+    public function paginate(int $page, int $itemsPerPage): self
+    {
+        $offset = $page * $itemsPerPage;
+
+        $this->append("LIMIT {$itemsPerPage} OFFSET {$offset}");
+
+        return $this;
+    }
+
     public function getQuery(): string
     {
         return $this->query;

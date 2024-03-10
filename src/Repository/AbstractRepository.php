@@ -458,6 +458,29 @@ abstract class AbstractRepository
         return $stmt;
     }
 
+    /**
+     * Returns the total amount of items of a given model
+     *
+     * @param string $tableName
+     * @return int
+     */
+    private function getItemsCount(string $tableName): int
+    {
+        $query = (new QueryBuilder())
+            ->select(["COUNT(*) as itemsCount"])
+            ->from($tableName)
+            ->getQuery();
+
+        $stmt = $this->pdo->query($query);
+        $result = $stmt->fetchAll(PDO::FETCH_CLASS);
+
+        if (!$result) {
+            return 0;
+        }
+
+        return $result[0]->itemsCount;
+    }
+
     #endregion
 
     #region Public methods
@@ -465,16 +488,24 @@ abstract class AbstractRepository
     /**
      * Entry function to findAll models
      *
-     * @return array|null
+     * @param int|null $page
+     * @param int|null $itemsPerPage
+     * @return Models\FetchedData|IModel[]
      * @throws Exceptions\ReflectionException
-     * @throws Exceptions\RepositoryException
      * @throws ReflectionException
+     * @throws RepositoryException
      */
-    public function findAll(): ?array
+    public function findAll(?int $page = null, ?int $itemsPerPage = null): Models\FetchedData|array
     {
+        $isPaginated = $page !== null && $itemsPerPage !== null;
+
         $queryBuilder = (new QueryBuilder())
             ->select()
             ->from($this->tableName);
+
+        if ($isPaginated) {
+            $queryBuilder->paginate($page, $itemsPerPage);
+        }
 
         $stmt = $this->pdo->query($queryBuilder->getQuery());
         $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
@@ -482,6 +513,18 @@ abstract class AbstractRepository
 
         foreach ($arr as $item) {
             $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
+        }
+
+        if ($isPaginated) {
+            $itemsCount = $this->getItemsCount($this->tableName);
+            $totalPages = (int)round($itemsCount / $itemsPerPage);
+
+            return new Models\FetchedData(
+                data: $mappedArr,
+                currentPage: $page,
+                itemsPerPage: $itemsPerPage,
+                totalPages: $totalPages
+            );
         }
 
         return $mappedArr;
