@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\DataModels;
+namespace AbstractRepo\Models;
 
 /**
  * Used to handle model fields
