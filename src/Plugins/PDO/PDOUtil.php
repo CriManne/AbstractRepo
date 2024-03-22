@@ -10,14 +10,14 @@ class PDOUtil
      * Returns the PDO type from the PHP type
      *
      * @param string $type
-     * @return ?int
+     * @return int
      */
-    public static function getPDOType(string $type): ?int
+    public static function getPDOType(string $type): int
     {
         return match ($type) {
-            'int', '?int' => \PDO::PARAM_INT,
+            'int', '?int', 'integer' => \PDO::PARAM_INT,
             '?string', 'string' => \PDO::PARAM_STR,
-            default => null,
+            default => \PDO::PARAM_STR,
         };
     }
 }

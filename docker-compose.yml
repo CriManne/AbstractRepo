@@ -10,6 +10,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command: bash -c "composer install && apache2-foreground"
+    env_file:
+      - .env
 
   database:
     image: mariadb
