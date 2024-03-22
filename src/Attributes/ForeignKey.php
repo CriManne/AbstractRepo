@@ -18,7 +18,7 @@ readonly final class ForeignKey
 
     public function __construct(
         public Relationship $relationship,
-        public ?string      $columnName = null
+        public string       $columnName
     )
     {
     }
@@ -28,7 +28,7 @@ readonly final class ForeignKey
         return $this->relationship;
     }
 
-    public function getColumnName(): ?string
+    public function getColumnName(): string
     {
         return $this->columnName;
     }
