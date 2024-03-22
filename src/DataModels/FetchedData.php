@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Models;
+namespace AbstractRepo\DataModels;
 
 use AbstractRepo\Interfaces\IModel;
 use JsonSerializable;
