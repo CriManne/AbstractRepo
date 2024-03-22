@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace AbstractRepo\Repository;
 
 use AbstractRepo\Attributes;
+use AbstractRepo\DataModels\FetchedData;
+use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Interfaces;
 use AbstractRepo\Interfaces\IModel;
-use AbstractRepo\Models;
+use AbstractRepo\DataModels;
 use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
@@ -26,8 +28,6 @@ use ReflectionException;
  */
 abstract class AbstractRepository
 {
-    private const FK_COLUMN_ID_SUFFIX = '_id';
-
     /**
      * @var string|mixed The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
      */
@@ -39,9 +39,9 @@ abstract class AbstractRepository
     private string $tableName;
 
     /**
-     * @var Models\ModelHandler The models handler
+     * @var DataModels\ModelHandler The models handler
      */
-    private Models\ModelHandler $modelHandler;
+    private DataModels\ModelHandler $modelHandler;
 
     /**
      * @param PDO $pdo
@@ -71,7 +71,7 @@ abstract class AbstractRepository
 
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $this->modelHandler = new Models\ModelHandler();
+        $this->modelHandler = new DataModels\ModelHandler();
 
         // Process the model
         $this->processModel($modelReflectionClass);
@@ -135,10 +135,6 @@ abstract class AbstractRepository
                         Attributes\ForeignKey::getColumnNameMethod,
                         $attributeInstance
                     );
-
-                    if (!$fkColumnName) {
-                        $fkColumnName = strtolower($reflectionProperty->getName()) . self::FK_COLUMN_ID_SUFFIX;
-                    }
                 }
             }
 
@@ -148,7 +144,7 @@ abstract class AbstractRepository
 
             $this->modelHandler->save(
                 fieldName: $propertyName,
-                fieldInfo: new Models\FieldInfo(
+                fieldInfo: new DataModels\FieldInfo(
                     fieldName: $propertyName,
                     fieldType: $propertyType,
                     isRequired: $isRequired,
@@ -197,7 +193,7 @@ abstract class AbstractRepository
         }
 
         // Get an array with just the columns names
-        $columns = array_map(fn(Models\ModelField $val) => $val->fieldName, $values);
+        $columns = array_map(fn(DataModels\ModelField $val) => $val->fieldName, $values);
 
         $queryBuilder->insert($this->tableName, $columns);
 
@@ -230,7 +226,7 @@ abstract class AbstractRepository
         }
 
         // Get the update string (ex: col1 = :col1, col2 = :col2)
-        $columns = array_map(fn(Models\ModelField $val) => $val->fieldName, $values);
+        $columns = array_map(fn(DataModels\ModelField $val) => $val->fieldName, $values);
 
         $queryBuilder->update($this->tableName, $columns);
 
@@ -295,7 +291,7 @@ abstract class AbstractRepository
             if (!$field->isIdentity) {
 
                 // If is a fk
-                if ($field->fkType !== null) {
+                if ($field->fkType) {
 
                     if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model
@@ -332,7 +328,7 @@ abstract class AbstractRepository
                 }
 
                 // Array to store all the information to create the insert
-                $values[] = new Models\ModelField(
+                $values[] = new DataModels\ModelField(
                     fieldName: $propertyName,
                     fieldType: $propertyType,
                     fieldValue: $value
@@ -441,7 +437,7 @@ abstract class AbstractRepository
     /**
      * Bind the values in the array passed to the statement received
      *
-     * @param Models\ModelField[] $values
+     * @param DataModels\ModelField[] $values
      * @param PDOStatement $stmt
      * @return PDOStatement
      */
@@ -488,26 +484,42 @@ abstract class AbstractRepository
     /**
      * Entry function to findAll models
      *
-     * @param int|null $page
-     * @param int|null $itemsPerPage
-     * @return Models\FetchedData|IModel[]
+     * @param FetchParams|null $params
+     * @return FetchedData|IModel[]
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      * @throws RepositoryException
      */
-    public function findAll(?int $page = null, ?int $itemsPerPage = null): Models\FetchedData|array
+    public function find(?DataModels\FetchParams $params = null): DataModels\FetchedData|array
     {
-        $isPaginated = $page !== null && $itemsPerPage !== null;
+        $isPaginated = $params?->getPage() !== null && $params?->getItemsPerPage() !== null;
 
         $queryBuilder = (new QueryBuilder())
             ->select()
             ->from($this->tableName);
 
-        if ($isPaginated) {
-            $queryBuilder->paginate($page, $itemsPerPage);
+        if ($params?->getConditions()) {
+            $queryBuilder->where($params->getConditions());
         }
 
-        $stmt = $this->pdo->query($queryBuilder->getQuery());
+        if ($isPaginated) {
+            $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
+        }
+
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+        foreach ($params?->getBind() ?? [] as $prop => $value) {
+            $type = gettype($value);
+            if ($type === 'array') {
+                $stringifiedArray = implode(',', $value);
+                $stmt->bindParam($prop, $stringifiedArray);
+            } else {
+                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
+            }
+        }
+
+        $stmt->execute();
+
         $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
         $mappedArr = [];
 
@@ -517,17 +529,31 @@ abstract class AbstractRepository
 
         if ($isPaginated) {
             $itemsCount = $this->getItemsCount($this->tableName);
-            $totalPages = (int)round($itemsCount / $itemsPerPage);
+            $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
 
-            return new Models\FetchedData(
+            return new DataModels\FetchedData(
                 data: $mappedArr,
-                currentPage: $page,
-                itemsPerPage: $itemsPerPage,
+                currentPage: $params->getPage(),
+                itemsPerPage: $params->getItemsPerPage(),
                 totalPages: $totalPages
             );
         }
 
         return $mappedArr;
+    }
+
+    /**
+     * @param FetchParams|null $params
+     * @return FetchedData|array
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     * @throws RepositoryException
+     */
+    public function findFirst(?DataModels\FetchParams $params = null): DataModels\FetchedData|array
+    {
+        $params->setPage(0);
+        $params->setItemsPerPage(1);
+        return $this->find($params);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
+use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Models\T1;
 use AbstractRepo\Test\Models\T2;
@@ -13,67 +14,8 @@ use PDO;
 use ReflectionException;
 use AbstractRepo\Exceptions;
 
-class AbstractRepositoryTest extends TestCase
+class AbstractRepositoryTest extends BaseTest
 {
-    /**
-     * @var string
-     */
-    public static string $dsnTest = "define-here-test-dsn";
-    /**
-     * @var string
-     */
-    public static string $username = "define-here-test-username";
-    /**
-     * @var string
-     */
-    public static string $password = "define-here-test-password";
-
-    /**
-     * @var PDO
-     */
-    public static PDO $pdo;
-
-    /**
-     * @var T1Repository
-     */
-    public static T1Repository $t1Repo;
-
-    /**
-     * @var T2Repository
-     */
-    public static T2Repository $t2Repo;
-
-    /**
-     * @var T3Repository
-     */
-    public static T3Repository $t3Repo;
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     * @throws ReflectionException
-     */
-    public static function setUpBeforeClass(): void
-    {
-        self::$pdo = new PDO(self::$dsnTest, self::$username, self::$password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES => FALSE]);
-        self::$pdo->exec(file_get_contents('./tests/test_schema.sql'));
-        self::$t1Repo = new T1Repository(self::$pdo);
-        self::$t2Repo = new T2Repository(self::$pdo);
-        self::$t3Repo = new T3Repository(self::$pdo);
-    }
-
-    /**
-     * @return void
-     */
-    public function setUp(): void
-    {
-        self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-        self::$pdo->exec("TRUNCATE TABLE t1;");
-        self::$pdo->exec("TRUNCATE TABLE t2;");
-        self::$pdo->exec("TRUNCATE TABLE t3;");
-        self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-    }
-
     /**
      * @return void
      * @throws RepositoryException
@@ -135,7 +77,7 @@ class AbstractRepositoryTest extends TestCase
             $t = new T1($i, "test");
             self::$t1Repo->save($t);
         }
-        $this->assertCount(50, self::$t1Repo->findAll());
+        $this->assertCount(50, self::$t1Repo->find());
     }
 
     /**
@@ -293,11 +235,70 @@ class AbstractRepositoryTest extends TestCase
         self::$t2Repo->update($t2);
     }
 
-    /**
-     * @return void
-     */
-    public static function tearDownAfterClass(): void
+    public function testValidFindWhere(): void
     {
-        self::$pdo->exec(file_get_contents('./tests/drop_test_schema.sql'));
+        $t1 = new T1(1, "testRelation");
+        self::$t1Repo->save($t1);
+
+        $this->assertNotNull(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id = :id AND v1 = :v1",
+                    bind: [
+                        "id" => 1,
+                        "v1" => 'testRelation'
+                    ]
+                )
+            )
+        );
+    }
+
+    public function testValidFindInArray(): void
+    {
+        $t1 = new T1(1, "testRelation");
+        self::$t1Repo->save($t1);
+
+        $this->assertNotEmpty(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id IN (:ids)",
+                    bind: [
+                        "ids" => [1,2,4]
+                    ]
+                )
+            )
+        );
+
+        $this->assertEmpty(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id IN (:ids)",
+                    bind: [
+                        "ids" => [523,2,4]
+                    ]
+                )
+            )
+        );
+    }
+
+    public function testValidFindFirst(): void
+    {
+        $t1 = new T1(1, "test");
+        self::$t1Repo->save($t1);
+
+        $t2 = new T1(2, "test");
+        self::$t1Repo->save($t2);
+
+        $this->assertEquals(
+            1,
+            self::$t1Repo->findFirst(
+                new FetchParams(
+                    conditions: "v1 LIKE :v1",
+                    bind: [
+                        "v1" => '%test%'
+                    ]
+                )
+            )->getData()[0]->id
+        );
     }
 }
