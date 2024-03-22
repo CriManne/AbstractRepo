@@ -9,6 +9,7 @@ This  project is a small, lightweight  library for abstracting repositories  and
 ### Methods available:
 - *find* :   retrieves every record
 - *findFirst* :   retrieves the first record
+- *findByQuery* :   retrieves every record that matches the given query
 - *findById* : retrieves a specific record
 - *findWhere* : retrieves every record matching the where clause
 - *save* : saves the model passed
@@ -53,6 +54,13 @@ It also needs the column name on which make the foreign key.
 ...
 #[ForeignKey(Relationship::MANY_TO_ONE, 'book_id')]
 RelatedModel $obj;
+...
+```
+You can set some field to be searched in the **findByQuery** with the _Searchable_ attribute 
+```
+...
+#[Searchable]
+string $field;
 ...
 ```
 

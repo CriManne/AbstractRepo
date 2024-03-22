@@ -7,12 +7,14 @@ namespace AbstractRepo\Repository;
 use AbstractRepo\Attributes;
 use AbstractRepo\DataModels\FetchedData;
 use AbstractRepo\DataModels\FetchParams;
+use AbstractRepo\DataModels\FieldInfo;
+use AbstractRepo\DataModels\ModelField;
+use AbstractRepo\DataModels\ModelHandler;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Interfaces;
 use AbstractRepo\Interfaces\IModel;
-use AbstractRepo\DataModels;
 use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
@@ -39,9 +41,9 @@ abstract class AbstractRepository
     private string $tableName;
 
     /**
-     * @var DataModels\ModelHandler The models handler
+     * @var ModelHandler The models handler
      */
-    private DataModels\ModelHandler $modelHandler;
+    private ModelHandler $modelHandler;
 
     /**
      * @param PDO $pdo
@@ -71,7 +73,7 @@ abstract class AbstractRepository
 
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $this->modelHandler = new DataModels\ModelHandler();
+        $this->modelHandler = new ModelHandler();
 
         // Process the model
         $this->processModel($modelReflectionClass);
@@ -103,12 +105,20 @@ abstract class AbstractRepository
             // If the column name of the fk is specified we store it
             $fkColumnName = null;
 
+            // If the property is searchable
+            $isSearchable = false;
+
             // Attributes of the property
             $attributes = $reflectionProperty->getAttributes();
 
             foreach ($attributes as $attribute) {
                 $attributeInstance = $attribute->newInstance();
                 $attributeName = $attribute->getName();
+
+                // If the property is searchable
+                if ($attributeName === Attributes\Searchable::class) {
+                    $isSearchable = true;
+                }
 
                 // If is an identity we are not going to add it in the insert query
                 if ($attributeName === Attributes\Key::class) {
@@ -144,7 +154,7 @@ abstract class AbstractRepository
 
             $this->modelHandler->save(
                 fieldName: $propertyName,
-                fieldInfo: new DataModels\FieldInfo(
+                fieldInfo: new FieldInfo(
                     fieldName: $propertyName,
                     fieldType: $propertyType,
                     isRequired: $isRequired,
@@ -155,6 +165,10 @@ abstract class AbstractRepository
                     fkColumnName: $fkColumnName
                 )
             );
+
+            if ($isSearchable) {
+                $this->modelHandler->addSearchableField($propertyName);
+            }
         }
     }
 
@@ -193,7 +207,7 @@ abstract class AbstractRepository
         }
 
         // Get an array with just the columns names
-        $columns = array_map(fn(DataModels\ModelField $val) => $val->fieldName, $values);
+        $columns = array_map(fn(ModelField $val) => $val->fieldName, $values);
 
         $queryBuilder->insert($this->tableName, $columns);
 
@@ -226,7 +240,7 @@ abstract class AbstractRepository
         }
 
         // Get the update string (ex: col1 = :col1, col2 = :col2)
-        $columns = array_map(fn(DataModels\ModelField $val) => $val->fieldName, $values);
+        $columns = array_map(fn(ModelField $val) => $val->fieldName, $values);
 
         $queryBuilder->update($this->tableName, $columns);
 
@@ -328,7 +342,7 @@ abstract class AbstractRepository
                 }
 
                 // Array to store all the information to create the insert
-                $values[] = new DataModels\ModelField(
+                $values[] = new ModelField(
                     fieldName: $propertyName,
                     fieldType: $propertyType,
                     fieldValue: $value
@@ -437,7 +451,7 @@ abstract class AbstractRepository
     /**
      * Bind the values in the array passed to the statement received
      *
-     * @param DataModels\ModelField[] $values
+     * @param ModelField[] $values
      * @param PDOStatement $stmt
      * @return PDOStatement
      */
@@ -490,7 +504,7 @@ abstract class AbstractRepository
      * @throws ReflectionException
      * @throws RepositoryException
      */
-    public function find(?DataModels\FetchParams $params = null): DataModels\FetchedData|array
+    public function find(?FetchParams $params = null): FetchedData|array
     {
         $isPaginated = $params?->getPage() !== null && $params?->getItemsPerPage() !== null;
 
@@ -531,7 +545,7 @@ abstract class AbstractRepository
             $itemsCount = $this->getItemsCount($this->tableName);
             $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
 
-            return new DataModels\FetchedData(
+            return new FetchedData(
                 data: $mappedArr,
                 currentPage: $params->getPage(),
                 itemsPerPage: $params->getItemsPerPage(),
@@ -543,13 +557,55 @@ abstract class AbstractRepository
     }
 
     /**
+     * @param mixed $query
+     * @param int|null $page
+     * @param int|null $itemsPerPage
+     * @return FetchedData|array
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     * @throws RepositoryException
+     */
+    public function findByQuery(mixed $query, ?int $page, ?int $itemsPerPage): FetchedData|array
+    {
+        $conditions = null;
+        $bind = null;
+
+        $searchableFields = $this->modelHandler->getSearchableFields();
+
+        if (!empty($searchableFields)) {
+            $query = '%' . $query . '%';
+
+            $conditionsArray = [];
+            $bind = [];
+
+            foreach ($searchableFields as $field) {
+                $bindPlaceholder = "query{$field}";
+
+                $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
+                $bind[$bindPlaceholder] = $query;
+            }
+
+            $conditions = implode(' OR ', $conditionsArray);
+        }
+
+        return $this->find(
+            new FetchParams(
+                page: $page,
+                itemsPerPage: $itemsPerPage,
+                conditions: $conditions,
+                bind: $bind
+            )
+        );
+    }
+
+    /**
      * @param FetchParams|null $params
      * @return FetchedData|array
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      * @throws RepositoryException
      */
-    public function findFirst(?DataModels\FetchParams $params = null): DataModels\FetchedData|array
+    public function findFirst(?FetchParams $params = null): FetchedData|array
     {
         $params->setPage(0);
         $params->setItemsPerPage(1);
