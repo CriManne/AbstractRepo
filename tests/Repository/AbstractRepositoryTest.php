@@ -301,4 +301,35 @@ class AbstractRepositoryTest extends BaseTest
             )->getData()[0]->id
         );
     }
+
+    public function testSearchByQUery(): void
+    {
+        $t3 = new T3('Ciaosolecome', "solecuoreamore");
+        self::$t3Repo->save($t3);
+
+        $this->assertEquals(
+            'Ciaosolecome',
+            self::$t3Repo->findByQuery(
+                query: 'sole',
+                page: 0,
+                itemsPerPage: 10
+            )->getData()[0]->id
+        );
+
+        $this->assertNotEmpty(
+            self::$t3Repo->findByQuery(
+                query: 'AMOR',
+                page: 0,
+                itemsPerPage: 10
+            )->getData()
+        );
+
+        $this->assertEmpty(
+            self::$t3Repo->findByQuery(
+                query: 'AMORsdasda',
+                page: 0,
+                itemsPerPage: 10
+            )->getData()
+        );
+    }
 }
