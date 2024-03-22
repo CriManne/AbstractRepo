@@ -2,3 +2,4 @@ vendor/*
 TODO.md
 composer.lock
 .idea/
+.env
