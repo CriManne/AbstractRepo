@@ -16,7 +16,10 @@ class T2 implements IModel{
         #[Key(false)]
         public int $id,
         public string $v1,
-        #[ForeignKey(Relationship::MANY_TO_ONE)]
+        #[ForeignKey(
+            relationship: Relationship::MANY_TO_ONE,
+            columnName: 't1_id'
+        )]
         public T1 $t1
     ){}
 }

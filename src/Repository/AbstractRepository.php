@@ -26,8 +26,6 @@ use ReflectionException;
  */
 abstract class AbstractRepository
 {
-    private const FK_COLUMN_ID_SUFFIX = '_id';
-
     /**
      * @var string|mixed The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
      */
@@ -135,10 +133,6 @@ abstract class AbstractRepository
                         Attributes\ForeignKey::getColumnNameMethod,
                         $attributeInstance
                     );
-
-                    if (!$fkColumnName) {
-                        $fkColumnName = strtolower($reflectionProperty->getName()) . self::FK_COLUMN_ID_SUFFIX;
-                    }
                 }
             }
 
@@ -295,7 +289,7 @@ abstract class AbstractRepository
             if (!$field->isIdentity) {
 
                 // If is a fk
-                if ($field->fkType !== null) {
+                if ($field->fkType) {
 
                     if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model

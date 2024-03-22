@@ -9,9 +9,9 @@ use Demo\Author;
 use Demo\BookRepository;
 use Demo\AuthorRepository;
 
-$dsn= "define-dsn-here";
-$username = "define-username-here";
-$password = "define-password-here";
+$dsn= getenv('DB_DSN');
+$username = getenv('DB_USERNAME');
+$password = getenv('DB_PASSWORD');
 
 $pdo = new PDO($dsn, $username, $password);
 
