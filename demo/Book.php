@@ -15,10 +15,7 @@ class Book implements IModel
 {
     function __construct(
         public string $val,
-        #[ForeignKey(
-            relationship: Relationship::MANY_TO_ONE,
-            columnName: 'author_id'
-        )]
+        #[ForeignKey(Relationship::MANY_TO_ONE)]
         public Author $author,
         #[Key(true)]
         public ?int   $id = null

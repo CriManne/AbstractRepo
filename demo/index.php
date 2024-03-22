@@ -9,9 +9,9 @@ use Demo\Author;
 use Demo\BookRepository;
 use Demo\AuthorRepository;
 
-$dsn= getenv('DB_DSN');
-$username = getenv('DB_USERNAME');
-$password = getenv('DB_PASSWORD');
+$dsn= "define-dsn-here";
+$username = "define-username-here";
+$password = "define-password-here";
 
 $pdo = new PDO($dsn, $username, $password);
 
@@ -37,7 +37,7 @@ $authRepo->save($author);
 
 $bookRepo->save($book);
 
-$bookRepo->find();
+$bookRepo->findAll();
 
 $bookRepo->findById(1);
 
@@ -51,6 +51,6 @@ $author->val ="Updated author value";
 
 $authRepo->update($author);
 
-$bookRepo->find();
+$bookRepo->findAll();
 
 $bookRepo->findById(1);

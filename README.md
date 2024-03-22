@@ -7,8 +7,7 @@
 This  project is a small, lightweight  library for abstracting repositories  and avoiding writing a lot of repository logic. It uses [Reflection](https://www.php.net/manual/en/book.reflection.php) and [PHP 8 Attributes](https://www.php.net/manual/en/language.attributes.overview.php) on the generic and abstract class (*AbstractRepository*) that provides basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) methods.
 
 ### Methods available:
-- *find* :   retrieves every record
-- *findFirst* :   retrieves the first record
+- *findAll* :   retrieves every record
 - *findById* : retrieves a specific record
 - *findWhere* : retrieves every record matching the where clause
 - *save* : saves the model passed
@@ -47,11 +46,10 @@ To define a primary key, you have to use the ***Key*** attribute on the field. T
 int $ID;
 ...
 ```
-If you have a foreign key in the entity you can flag it with the ***ForeignKey*** attribute that requires the ***Relationship*** enum: MANY_TO_ONE, ONE_TO_ONE ( the ONE_TO_MANY relation needs to me implemented ).
-It also needs the column name on which make the foreign key.
+If you have a foreign key in the entity you can flag it with the ***ForeignKey*** attribute that accepts the ***Relationship*** enum: MANY_TO_ONE, ONE_TO_ONE ( the ONE_TO_MANY relation needs to me implemented ).
 ```
 ...
-#[ForeignKey(Relationship::MANY_TO_ONE, 'book_id')]
+#[ForeignKey(Relationship::MANY_TO_ONE)]
 RelatedModel $obj;
 ...
 ```

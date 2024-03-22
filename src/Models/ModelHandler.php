@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\DataModels;
+namespace AbstractRepo\Models;
 
-use AbstractRepo\DataModels;
+use AbstractRepo\Models;
 use AbstractRepo\Exceptions;
 
 final class ModelHandler
