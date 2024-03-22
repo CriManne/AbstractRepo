@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
+use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Models\T1;
 use AbstractRepo\Test\Models\T2;
@@ -76,7 +77,7 @@ class AbstractRepositoryTest extends BaseTest
             $t = new T1($i, "test");
             self::$t1Repo->save($t);
         }
-        $this->assertCount(50, self::$t1Repo->findAll());
+        $this->assertCount(50, self::$t1Repo->find());
     }
 
     /**
@@ -232,5 +233,72 @@ class AbstractRepositoryTest extends BaseTest
         $t2 = new T2(4, "test2", $t1);
 
         self::$t2Repo->update($t2);
+    }
+
+    public function testValidFindWhere(): void
+    {
+        $t1 = new T1(1, "testRelation");
+        self::$t1Repo->save($t1);
+
+        $this->assertNotNull(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id = :id AND v1 = :v1",
+                    bind: [
+                        "id" => 1,
+                        "v1" => 'testRelation'
+                    ]
+                )
+            )
+        );
+    }
+
+    public function testValidFindInArray(): void
+    {
+        $t1 = new T1(1, "testRelation");
+        self::$t1Repo->save($t1);
+
+        $this->assertNotEmpty(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id IN (:ids)",
+                    bind: [
+                        "ids" => [1,2,4]
+                    ]
+                )
+            )
+        );
+
+        $this->assertEmpty(
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "id IN (:ids)",
+                    bind: [
+                        "ids" => [523,2,4]
+                    ]
+                )
+            )
+        );
+    }
+
+    public function testValidFindFirst(): void
+    {
+        $t1 = new T1(1, "test");
+        self::$t1Repo->save($t1);
+
+        $t2 = new T1(2, "test");
+        self::$t1Repo->save($t2);
+
+        $this->assertEquals(
+            1,
+            self::$t1Repo->findFirst(
+                new FetchParams(
+                    conditions: "v1 LIKE :v1",
+                    bind: [
+                        "v1" => '%test%'
+                    ]
+                )
+            )->getData()[0]->id
+        );
     }
 }

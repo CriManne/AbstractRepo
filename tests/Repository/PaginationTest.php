@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
+use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Models\T1;
 use AbstractRepo\Test\Models\T2;
@@ -28,7 +29,7 @@ class PaginationTest extends BaseTest
             self::$t1Repo->save($t);
         }
 
-        $this->assertEquals('test108', self::$t1Repo->findAll(2, 4)->getData()[0]->v1);
+        $this->assertEquals('test108', self::$t1Repo->find(new FetchParams(page: 2, itemsPerPage: 4))->getData()[0]->v1);
     }
 
     /**
@@ -44,7 +45,7 @@ class PaginationTest extends BaseTest
             self::$t1Repo->save($t);
         }
 
-        $this->assertEquals(10, self::$t1Repo->findAll(2, 4)->getTotalPages());
+        $this->assertEquals(10, self::$t1Repo->find(new FetchParams(page: 2, itemsPerPage: 4))->getTotalPages());
     }
 
     /**
@@ -55,7 +56,7 @@ class PaginationTest extends BaseTest
      */
     public function testOverPagination(): void
     {
-        $this->assertEmpty(self::$t1Repo->findAll(2, 4)->getData());
+        $this->assertEmpty(self::$t1Repo->find(new FetchParams(page: 2, itemsPerPage: 4))->getData());
     }
 
     /**
@@ -71,7 +72,7 @@ class PaginationTest extends BaseTest
             self::$t1Repo->save($t);
         }
 
-        $this->assertCount(10, self::$t1Repo->findAll(0, 10)->getData());
-        $this->assertEquals('test100', self::$t1Repo->findAll(0, 10)->getData()[0]->v1);
+        $this->assertCount(10, self::$t1Repo->find(new FetchParams(page: 0, itemsPerPage: 10))->getData());
+        $this->assertEquals('test100', self::$t1Repo->find(new FetchParams(page: 0, itemsPerPage: 10))->getData()[0]->v1);
     }
 }

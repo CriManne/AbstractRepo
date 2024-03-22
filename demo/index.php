@@ -37,7 +37,7 @@ $authRepo->save($author);
 
 $bookRepo->save($book);
 
-$bookRepo->findAll();
+$bookRepo->find();
 
 $bookRepo->findById(1);
 
@@ -51,6 +51,6 @@ $author->val ="Updated author value";
 
 $authRepo->update($author);
 
-$bookRepo->findAll();
+$bookRepo->find();
 
 $bookRepo->findById(1);
