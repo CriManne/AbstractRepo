@@ -623,16 +623,21 @@ abstract class AbstractRepository
 
     /**
      * @param FetchParams|null $params
-     * @return FetchedData|array
+     * @return IModel|null
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      * @throws RepositoryException
      */
-    public function findFirst(?FetchParams $params = null): FetchedData|array
+    public function findFirst(?FetchParams $params = null): IModel|null
     {
         $params->setPage(0);
         $params->setItemsPerPage(1);
-        return $this->find($params);
+        $data = $this->find($params)->getData();
+        if (empty($data)) {
+            return null;
+        }
+
+        return $data[0];
     }
 
     /**
