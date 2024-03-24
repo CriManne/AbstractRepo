@@ -332,7 +332,7 @@ class AbstractRepositoryTest extends BaseTest
                         "v1" => '%test%'
                     ]
                 )
-            )->getData()[0]->id
+            )->id
         );
     }
 
