@@ -75,4 +75,20 @@ class PaginationTest extends BaseTest
         $this->assertCount(10, self::$t1Repo->find(new FetchParams(page: 0, itemsPerPage: 10))->getData());
         $this->assertEquals('test100', self::$t1Repo->find(new FetchParams(page: 0, itemsPerPage: 10))->getData()[0]->v1);
     }
+
+    /**
+     * @return void
+     * @throws ReflectionException
+     * @throws RepositoryException
+     * @throws Exceptions\ReflectionException
+     */
+    public function testPaginationCountWithFilters(): void
+    {
+        for ($i = 100; $i < 240; $i++) {
+            $t = new T1($i, "test" . $i);
+            self::$t1Repo->save($t);
+        }
+
+        $this->assertEquals(15, self::$t1Repo->find(new FetchParams(page: 0, itemsPerPage: 1,conditions: "id >= 130 AND id < 145"))->getTotalPages());
+    }
 }

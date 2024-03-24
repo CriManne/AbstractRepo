@@ -239,21 +239,29 @@ abstract class AbstractRepository
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
         }
 
-        // Get the update string (ex: col1 = :col1, col2 = :col2)
-        $columns = array_map(fn(ModelField $val) => $val->fieldName, $values);
-
-        $queryBuilder->update($this->tableName, $columns);
-
         $keyProp = ReflectionUtility::getKeyProperty($model::class);
         $keyPropName = $keyProp->name;
         $keyPropValue = $keyProp->getValue($model);
 
-        $queryBuilder->where("{$keyPropName} = {$keyPropValue}");
+        // Get the update string (ex: col1 = :col1, col2 = :col2)
+        $nonPkColumns = [];
+
+        foreach ($values as $val) {
+            if ($val->fieldName !== $keyPropName) {
+                $nonPkColumns[] = $val->fieldName;
+            }
+        }
+
+        $queryBuilder->update($this->tableName, $nonPkColumns);
+
+        $queryBuilder->where("{$keyPropName} = " . QueryBuilder::BIND_CHAR . "{$keyPropName}");
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        // Bind values to the statement
+        // Bind values to the statement and also for the where id = :id
         $stmt = $this->bindValues($values, $stmt);
+
+        $stmt->bindParam($keyPropName, $keyPropValue, PDOUtil::getPDOType(gettype($keyPropValue)));
 
         return $stmt;
     }
@@ -276,9 +284,11 @@ abstract class AbstractRepository
 
         $queryBuilder
             ->delete($this->tableName)
-            ->where("{$keyPropName} = {$keyPropValue}");
+            ->where("{$keyPropName} = " . QueryBuilder::BIND_CHAR . "{$keyPropName}");
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+        $stmt->bindParam($keyPropName, $keyPropValue, PDOUtil::getPDOType(gettype($keyPropValue)));
 
         return $stmt;
     }
@@ -287,7 +297,7 @@ abstract class AbstractRepository
      * Returns an array used in the insert an update operation to get every value of the object
      *
      * @param Interfaces\IModel $model
-     * @return array
+     * @return ModelField[]
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
@@ -469,19 +479,25 @@ abstract class AbstractRepository
     }
 
     /**
-     * Returns the total amount of items of a given model
+     * Returns the total amount of items of a given query
      *
-     * @param string $tableName
+     * @param string $subquery
+     * @param FetchParams|null $params
      * @return int
      */
-    private function getItemsCount(string $tableName): int
+    private function getItemsCount(string $subquery, ?FetchParams $params): int
     {
         $query = (new QueryBuilder())
             ->select(["COUNT(*) as itemsCount"])
-            ->from($tableName)
+            ->from("({$subquery}) AS subquery")
             ->getQuery();
 
-        $stmt = $this->pdo->query($query);
+        $stmt = $this->pdo->prepare($query);
+
+        $this->bindParams($stmt, $params);
+
+        $stmt->execute();
+
         $result = $stmt->fetchAll(PDO::FETCH_CLASS);
 
         if (!$result) {
@@ -489,6 +505,19 @@ abstract class AbstractRepository
         }
 
         return $result[0]->itemsCount;
+    }
+
+    private function bindParams(PDOStatement &$stmt, ?FetchParams $params): void
+    {
+        foreach ($params?->getBind() ?? [] as $prop => $value) {
+            $type = gettype($value);
+            if ($type === 'array') {
+                $stringifiedArray = implode(',', $value);
+                $stmt->bindParam($prop, $stringifiedArray);
+            } else {
+                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
+            }
+        }
     }
 
     #endregion
@@ -516,21 +545,15 @@ abstract class AbstractRepository
             $queryBuilder->where($params->getConditions());
         }
 
+        $queryNonPaginated = $queryBuilder->getQuery();
+
         if ($isPaginated) {
             $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
         }
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        foreach ($params?->getBind() ?? [] as $prop => $value) {
-            $type = gettype($value);
-            if ($type === 'array') {
-                $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($prop, $stringifiedArray);
-            } else {
-                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
-            }
-        }
+        $this->bindParams($stmt, $params);
 
         $stmt->execute();
 
@@ -542,7 +565,7 @@ abstract class AbstractRepository
         }
 
         if ($isPaginated) {
-            $itemsCount = $this->getItemsCount($this->tableName);
+            $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
             $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
 
             return new FetchedData(
@@ -662,7 +685,13 @@ abstract class AbstractRepository
             $stmt->execute();
 
             // Set id to the saved model
-            ReflectionUtility::getKeyProperty($this->modelClass)->setValue($model, $this->pdo->lastInsertId());
+            $key = ReflectionUtility::getKeyProperty($this->modelClass);
+
+            $keyField = $this->modelHandler->get($key->getName());
+
+            if ($keyField->isIdentity) {
+                $key->setValue($model, $this->pdo->lastInsertId());
+            }
         } catch (PDOException $ex) {
             throw new Exceptions\RepositoryException($ex->getMessage());
         }
