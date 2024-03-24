@@ -566,7 +566,7 @@ abstract class AbstractRepository
 
         if ($isPaginated) {
             $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
-            $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
+            $totalPages = (int)ceil($itemsCount / $params->getItemsPerPage());
 
             return new FetchedData(
                 data: $mappedArr,
