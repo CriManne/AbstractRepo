@@ -9,10 +9,7 @@ use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Models\T1;
 use AbstractRepo\Test\Models\T2;
 use AbstractRepo\Test\Models\T3;
-use PHPUnit\Framework\TestCase;
-use PDO;
 use ReflectionException;
-use AbstractRepo\Exceptions;
 
 class AbstractRepositoryTest extends BaseTest
 {
@@ -31,8 +28,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelSaveAndFindById(): void
     {
@@ -44,8 +39,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelSaveAndFindByIdString(): void
     {
@@ -57,8 +50,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelSaveAndFindByIdWrongId(): void
     {
@@ -68,8 +59,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelSaveAndFindAll(): void
     {
@@ -83,8 +72,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelUpdateAndFindById(): void
     {
@@ -102,8 +89,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelUpdateAndFindByIdT3(): void
     {
@@ -121,8 +106,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelUpdateAndFindByIdWrongId(): void
     {
@@ -142,8 +125,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelDeleteAndFindById(): void
     {
@@ -157,8 +138,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidModelDeleteAndFindByIdT3(): void
     {
@@ -172,8 +151,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidRelationalModelSave(): void
     {
@@ -189,8 +166,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testInvalidRelationalModelSave(): void
     {
@@ -203,8 +178,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidRelationalModelDelete(): void
     {
@@ -220,8 +193,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testInValidRelationalModelDelete(): void
     {
@@ -236,8 +207,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testValidRelationalModelUpdate(): void
     {
@@ -257,8 +226,6 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     public function testInvalidRelationalModelUpdate(): void
     {
@@ -332,7 +299,7 @@ class AbstractRepositoryTest extends BaseTest
                         "v1" => '%test%'
                     ]
                 )
-            )->getData()[0]->id
+            )->id
         );
     }
 

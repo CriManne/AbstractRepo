@@ -12,7 +12,6 @@ use AbstractRepo\DataModels\ModelField;
 use AbstractRepo\DataModels\ModelHandler;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
-use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Interfaces;
 use AbstractRepo\Interfaces\IModel;
 use AbstractRepo\Plugins\ORM\ORM;
@@ -20,10 +19,10 @@ use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
 use PDO;
-use PDOException;
 use PDOStatement;
 use ReflectionClass;
 use ReflectionException;
+use Exception;
 
 /**
  * The abstract class from which extends the repository
@@ -48,7 +47,7 @@ abstract class AbstractRepository
     /**
      * @param PDO $pdo
      * @throws ReflectionException
-     * @throws RepositoryException
+     * @throws Exceptions\RepositoryException
      */
     function __construct(
         protected PDO $pdo
@@ -177,7 +176,7 @@ abstract class AbstractRepository
      *
      * @param IModel $model
      * @return void
-     * @throws RepositoryException
+     * @throws Exceptions\RepositoryException
      */
     private function validateRequest(Interfaces\IModel $model): void
     {
@@ -193,7 +192,7 @@ abstract class AbstractRepository
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
-     * @throws RepositoryException If the model has no valid fields to take the data from
+     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
      */
     private function getInsertStatement(Interfaces\IModel $model): PDOStatement
     {
@@ -214,9 +213,7 @@ abstract class AbstractRepository
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
         // For each placeholder (:colName) bind the param with its type
-        $stmt = $this->bindValues($values, $stmt);
-
-        return $stmt;
+        return $this->bindValues($values, $stmt);
     }
 
     /**
@@ -226,7 +223,7 @@ abstract class AbstractRepository
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
-     * @throws RepositoryException If the model has no valid fields to take the data from
+     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
      */
     private function getUpdateStatement(Interfaces\IModel $model): PDOStatement
     {
@@ -319,8 +316,8 @@ abstract class AbstractRepository
 
                     if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model
-                        $fkKeyPropertyRefl = ReflectionUtility::getKeyProperty($field->fieldType);
-                        $fkKeyProperty = $fkKeyPropertyRefl->name;
+                        $fkKeyPropertyReflected = ReflectionUtility::getKeyProperty($field->fieldType);
+                        $fkKeyProperty = $fkKeyPropertyReflected->name;
                         $value = $model->$propertyName->$fkKeyProperty;
 
                         // Check if the ID is valid and therefore if there is a related record in the database
@@ -330,7 +327,7 @@ abstract class AbstractRepository
                             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
                         }
 
-                        $propertyType = strval($fkKeyPropertyRefl->getType());
+                        $propertyType = strval($fkKeyPropertyReflected->getType());
 
                         // If the column name is specified in the Attributes\ForeignKey attribute use it
                         if (!is_null($field->fkColumnName)) {
@@ -413,7 +410,6 @@ abstract class AbstractRepository
      * @param mixed $obj
      * @param string $modelClass
      * @return Interfaces\IModel|null
-     * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException If the related object is not found or if the orm mapping triggers an exception
      * @throws ReflectionException
      */
@@ -428,9 +424,9 @@ abstract class AbstractRepository
 
             $columnName = $fkField->fkColumnName;
 
-            $fkReflClass = ReflectionUtility::getReflectionClass(class: $fkField->fieldType);
+            $fkReflectedClass = ReflectionUtility::getReflectionClass(class: $fkField->fieldType);
 
-            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $fkReflClass);
+            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $fkReflectedClass);
 
             // Removes the id from the object
             $id = $obj[$columnName];
@@ -507,7 +503,7 @@ abstract class AbstractRepository
         return $result[0]->itemsCount;
     }
 
-    private function bindParams(PDOStatement &$stmt, ?FetchParams $params): void
+    private function bindParams(PDOStatement $stmt, ?FetchParams $params): void
     {
         foreach ($params?->getBind() ?? [] as $prop => $value) {
             $type = gettype($value);
@@ -529,54 +525,56 @@ abstract class AbstractRepository
      *
      * @param FetchParams|null $params
      * @return FetchedData|IModel[]
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
-     * @throws RepositoryException
+     * @throws Exceptions\RepositoryException
      */
     public function find(?FetchParams $params = null): FetchedData|array
     {
-        $isPaginated = $params?->getPage() !== null && $params?->getItemsPerPage() !== null;
+        try {
+            $isPaginated = $params?->getPage() !== null && $params?->getItemsPerPage() !== null;
 
-        $queryBuilder = (new QueryBuilder())
-            ->select()
-            ->from($this->tableName);
+            $queryBuilder = (new QueryBuilder())
+                ->select()
+                ->from($this->tableName);
 
-        if ($params?->getConditions()) {
-            $queryBuilder->where($params->getConditions());
+            if ($params?->getConditions()) {
+                $queryBuilder->where($params->getConditions());
+            }
+
+            $queryNonPaginated = $queryBuilder->getQuery();
+
+            if ($isPaginated) {
+                $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
+            }
+
+            $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+            $this->bindParams($stmt, $params);
+
+            $stmt->execute();
+
+            $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $mappedArr = [];
+
+            foreach ($arr as $item) {
+                $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
+            }
+
+            if ($isPaginated) {
+                $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
+                $totalPages = (int)ceil($itemsCount / $params->getItemsPerPage());
+
+                return new FetchedData(
+                    data: $mappedArr,
+                    currentPage: $params->getPage(),
+                    itemsPerPage: $params->getItemsPerPage(),
+                    totalPages: $totalPages
+                );
+            }
+
+            return $mappedArr;
+        } catch (Exception $e) {
+            throw new Exceptions\RepositoryException($e->getMessage());
         }
-
-        $queryNonPaginated = $queryBuilder->getQuery();
-
-        if ($isPaginated) {
-            $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
-        }
-
-        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
-
-        $this->bindParams($stmt, $params);
-
-        $stmt->execute();
-
-        $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
-        $mappedArr = [];
-
-        foreach ($arr as $item) {
-            $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
-        }
-
-        if ($isPaginated) {
-            $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
-            $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
-
-            return new FetchedData(
-                data: $mappedArr,
-                currentPage: $params->getPage(),
-                itemsPerPage: $params->getItemsPerPage(),
-                totalPages: $totalPages
-            );
-        }
-
-        return $mappedArr;
     }
 
     /**
@@ -584,55 +582,60 @@ abstract class AbstractRepository
      * @param int|null $page
      * @param int|null $itemsPerPage
      * @return FetchedData|array
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
-     * @throws RepositoryException
+     * @throws Exceptions\RepositoryException
      */
-    public function findByQuery(mixed $query, ?int $page, ?int $itemsPerPage): FetchedData|array
+    public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
-        $conditions = null;
-        $bind = null;
+        try {
+            $conditions = null;
+            $bind = null;
 
-        $searchableFields = $this->modelHandler->getSearchableFields();
+            $searchableFields = $this->modelHandler->getSearchableFields();
 
-        if (!empty($searchableFields)) {
-            $query = '%' . $query . '%';
+            if (!empty($searchableFields)) {
+                $query = '%' . $query . '%';
 
-            $conditionsArray = [];
-            $bind = [];
+                $conditionsArray = [];
+                $bind = [];
 
-            foreach ($searchableFields as $field) {
-                $bindPlaceholder = "query{$field}";
+                foreach ($searchableFields as $field) {
+                    $bindPlaceholder = "query{$field}";
 
-                $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
-                $bind[$bindPlaceholder] = $query;
+                    $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
+                    $bind[$bindPlaceholder] = $query;
+                }
+
+                $conditions = implode(' OR ', $conditionsArray);
             }
 
-            $conditions = implode(' OR ', $conditionsArray);
+            return $this->find(
+                new FetchParams(
+                    page: $page,
+                    itemsPerPage: $itemsPerPage,
+                    conditions: $conditions,
+                    bind: $bind
+                )
+            );
+        } catch (Exception $e) {
+            throw new Exceptions\RepositoryException($e->getMessage());
         }
-
-        return $this->find(
-            new FetchParams(
-                page: $page,
-                itemsPerPage: $itemsPerPage,
-                conditions: $conditions,
-                bind: $bind
-            )
-        );
     }
 
     /**
      * @param FetchParams|null $params
-     * @return FetchedData|array
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
-     * @throws RepositoryException
+     * @return IModel|null
+     * @throws Exceptions\RepositoryException
      */
-    public function findFirst(?FetchParams $params = null): FetchedData|array
+    public function findFirst(?FetchParams $params = null): IModel|null
     {
         $params->setPage(0);
         $params->setItemsPerPage(1);
-        return $this->find($params);
+        $data = $this->find($params)->getData();
+        if (empty($data)) {
+            return null;
+        }
+
+        return $data[0];
     }
 
     /**
@@ -640,31 +643,33 @@ abstract class AbstractRepository
      * @param $id
      * @param string|null $class
      * @param string|null $table
-     * @return Interfaces\IModel|null
-     * @throws Exceptions\ReflectionException
+     * @return IModel|null
      * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not configured properly
-     * @throws ReflectionException
      */
     public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
     {
-        // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
-        // called with different modelClasses and tableNames
-        $modelClass = $class ?? $this->modelClass;
-        $tableName = $table ?? $this->tableName;
+        try {
+            // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
+            // called with different modelClasses and tableNames
+            $modelClass = $class ?? $this->modelClass;
+            $tableName = $table ?? $this->tableName;
 
-        // Get the Attributes\Key property of the model
-        $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
+            // Get the Attributes\Key property of the model
+            $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
 
-        // Get the name of the Attributes\Key
-        $propertyName = $keyProperty->getName();
+            // Get the name of the Attributes\Key
+            $propertyName = $keyProperty->getName();
 
-        $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
+            $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
 
-        if (count($res) == 0) return null;
+            if (count($res) == 0) return null;
 
-        if (count($res) > 1) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::FETCH_BY_ID_MULTIPLE_RESULTS);
+            if (count($res) > 1) throw new Exceptions\RepositoryException(Exceptions\RepositoryException::FETCH_BY_ID_MULTIPLE_RESULTS);
 
-        return $res[0];
+            return $res[0];
+        } catch (Exception $e) {
+            throw new Exceptions\RepositoryException($e->getMessage());
+        }
     }
 
     /**
@@ -672,9 +677,7 @@ abstract class AbstractRepository
      *
      * @param Interfaces\IModel $model
      * @return void
-     * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException If the database triggers an exception
-     * @throws ReflectionException
      */
     public function save(Interfaces\IModel $model): void
     {
@@ -692,7 +695,7 @@ abstract class AbstractRepository
             if ($keyField->isIdentity) {
                 $key->setValue($model, $this->pdo->lastInsertId());
             }
-        } catch (PDOException $ex) {
+        } catch (Exception $ex) {
             throw new Exceptions\RepositoryException($ex->getMessage());
         }
     }
@@ -702,9 +705,7 @@ abstract class AbstractRepository
      *
      * @param Interfaces\IModel $model
      * @return void
-     * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException If the database triggers an exception
-     * @throws ReflectionException
      */
     public function update(Interfaces\IModel $model): void
     {
@@ -713,7 +714,7 @@ abstract class AbstractRepository
 
             $stmt = $this->getUpdateStatement($model);
             $stmt->execute();
-        } catch (PDOException $ex) {
+        } catch (Exception $ex) {
             throw new Exceptions\RepositoryException($ex->getMessage());
         }
     }
@@ -723,16 +724,14 @@ abstract class AbstractRepository
      *
      * @param $id
      * @return void
-     * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
      */
     public function delete($id): void
     {
         try {
             $stmt = $this->getDeleteStatement($id);
             $stmt->execute();
-        } catch (PDOException $ex) {
+        } catch (Exception $ex) {
             throw new Exceptions\RepositoryException($ex->getMessage());
         }
     }
