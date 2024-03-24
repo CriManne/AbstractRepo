@@ -479,19 +479,25 @@ abstract class AbstractRepository
     }
 
     /**
-     * Returns the total amount of items of a given model
+     * Returns the total amount of items of a given query
      *
-     * @param string $tableName
+     * @param string $subquery
+     * @param FetchParams|null $params
      * @return int
      */
-    private function getItemsCount(string $tableName): int
+    private function getItemsCount(string $subquery, ?FetchParams $params): int
     {
         $query = (new QueryBuilder())
             ->select(["COUNT(*) as itemsCount"])
-            ->from($tableName)
+            ->from("({$subquery}) AS subquery")
             ->getQuery();
 
-        $stmt = $this->pdo->query($query);
+        $stmt = $this->pdo->prepare($query);
+
+        $this->bindParams($stmt, $params);
+
+        $stmt->execute();
+
         $result = $stmt->fetchAll(PDO::FETCH_CLASS);
 
         if (!$result) {
@@ -499,6 +505,19 @@ abstract class AbstractRepository
         }
 
         return $result[0]->itemsCount;
+    }
+
+    private function bindParams(PDOStatement &$stmt, ?FetchParams $params): void
+    {
+        foreach ($params?->getBind() ?? [] as $prop => $value) {
+            $type = gettype($value);
+            if ($type === 'array') {
+                $stringifiedArray = implode(',', $value);
+                $stmt->bindParam($prop, $stringifiedArray);
+            } else {
+                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
+            }
+        }
     }
 
     #endregion
@@ -526,21 +545,15 @@ abstract class AbstractRepository
             $queryBuilder->where($params->getConditions());
         }
 
+        $queryNonPaginated = $queryBuilder->getQuery();
+
         if ($isPaginated) {
             $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
         }
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        foreach ($params?->getBind() ?? [] as $prop => $value) {
-            $type = gettype($value);
-            if ($type === 'array') {
-                $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($prop, $stringifiedArray);
-            } else {
-                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
-            }
-        }
+        $this->bindParams($stmt, $params);
 
         $stmt->execute();
 
@@ -552,7 +565,7 @@ abstract class AbstractRepository
         }
 
         if ($isPaginated) {
-            $itemsCount = $this->getItemsCount($this->tableName);
+            $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
             $totalPages = (int)round($itemsCount / $params->getItemsPerPage());
 
             return new FetchedData(
