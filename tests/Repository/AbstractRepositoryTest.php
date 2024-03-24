@@ -105,6 +105,25 @@ class AbstractRepositoryTest extends BaseTest
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      */
+    public function testValidModelUpdateAndFindByIdT3(): void
+    {
+        $t3 = new T3('admin@gmail.com', "test2");
+
+        self::$t3Repo->save($t3);
+
+        $t3->v1 = "test99";
+
+        self::$t3Repo->update($t3);
+
+        $this->assertEquals('test99', self::$t3Repo->findById('admin@gmail.com')->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
     public function testValidModelUpdateAndFindByIdWrongId(): void
     {
         $t1 = new T1(1, "test99");
@@ -133,6 +152,21 @@ class AbstractRepositoryTest extends BaseTest
         $this->assertNotEquals(null, self::$t1Repo->findById($t1->id));
         self::$t1Repo->delete($t1->id);
         $this->assertEquals(null, self::$t1Repo->findById($t1->id));
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    public function testValidModelDeleteAndFindByIdT3(): void
+    {
+        $t3 = new T3('admin@gmail.com', "test2");
+        self::$t3Repo->save($t3);
+        $this->assertNotEquals(null, self::$t3Repo->findById($t3->id));
+        self::$t3Repo->delete($t3->id);
+        $this->assertEquals(null, self::$t3Repo->findById($t3->id));
     }
 
     /**
