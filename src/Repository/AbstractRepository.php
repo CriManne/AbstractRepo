@@ -588,7 +588,7 @@ abstract class AbstractRepository
      * @throws ReflectionException
      * @throws RepositoryException
      */
-    public function findByQuery(mixed $query, ?int $page, ?int $itemsPerPage): FetchedData|array
+    public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
         $conditions = null;
         $bind = null;
