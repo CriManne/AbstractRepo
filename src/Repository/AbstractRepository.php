@@ -320,8 +320,12 @@ abstract class AbstractRepository
                         $fkKeyProperty = $fkKeyPropertyReflected->name;
                         $value = $model->$propertyName->$fkKeyProperty;
 
+                        // Take table name of the fk property
+                        $fkReflectedClass = ReflectionUtility::getReflectionClass($field->fieldType);
+                        $fkTableName = ReflectionUtility::getTableName($fkReflectedClass);
+
                         // Check if the ID is valid and therefore if there is a related record in the database
-                        $fkObj = $this->findById($value, $field->fieldType, $propertyName);
+                        $fkObj = $this->findById($value, $field->fieldType, $fkTableName);
 
                         if (!$fkObj) {
                             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
