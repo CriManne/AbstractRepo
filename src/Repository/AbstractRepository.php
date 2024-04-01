@@ -46,36 +46,39 @@ abstract class AbstractRepository
 
     /**
      * @param PDO $pdo
-     * @throws ReflectionException
      * @throws Exceptions\RepositoryException
      */
     function __construct(
         protected PDO $pdo
     )
     {
-        // If the repository doesn't implement IRepository it won't have the getModel method
-        if (!$this instanceof Interfaces\IRepository) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+        try {
+            // If the repository doesn't implement IRepository it won't have the getModel method
+            if (!$this instanceof Interfaces\IRepository) {
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+            }
+
+            // Invoke the method to get the model handled by the repository (ex: Book)
+            $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
+
+            $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
+
+            // Check if the class implements Interfaces\IModel
+            if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
+            }
+
+            $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
+
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+            $this->modelHandler = new ModelHandler();
+
+            // Process the model
+            $this->processModel($modelReflectionClass);
+        } catch (Exception $e) {
+            throw new Exceptions\RepositoryException($e->getMessage());
         }
-
-        // Invoke the method to get the model handled by the repository (ex: Book)
-        $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
-
-        $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
-
-        // Check if the class implements Interfaces\IModel
-        if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
-        }
-
-        $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
-
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        $this->modelHandler = new ModelHandler();
-
-        // Process the model
-        $this->processModel($modelReflectionClass);
     }
 
     #region Private methods
