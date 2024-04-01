@@ -207,6 +207,6 @@ final class ReflectionUtility
             $entityProperty->newInstance()
         );
 
-        return $tableName ?? strtolower($reflectionClass->getShortName());
+        return $tableName ?? $reflectionClass->getShortName();
     }
 }

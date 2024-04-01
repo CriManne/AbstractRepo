@@ -73,9 +73,9 @@ class BaseTest extends TestCase
     public function setUp(): void
     {
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-        self::$pdo->exec("TRUNCATE TABLE t1;");
-        self::$pdo->exec("TRUNCATE TABLE t2;");
-        self::$pdo->exec("TRUNCATE TABLE t3;");
+        self::$pdo->exec("TRUNCATE TABLE T1;");
+        self::$pdo->exec("TRUNCATE TABLE T2;");
+        self::$pdo->exec("TRUNCATE TABLE T3;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
