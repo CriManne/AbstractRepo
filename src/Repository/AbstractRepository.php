@@ -169,7 +169,11 @@ abstract class AbstractRepository
             );
 
             if ($isSearchable) {
-                $this->modelHandler->addSearchableField($propertyName);
+                if ($typeOfFk !== null) {
+                    $this->modelHandler->addSearchableField($fkColumnName);
+                } else {
+                    $this->modelHandler->addSearchableField($propertyName);
+                }
             }
         }
     }
