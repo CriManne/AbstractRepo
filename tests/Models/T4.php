@@ -16,6 +16,7 @@ class T4 implements IModel{
     public function __construct(
         #[Key(false)]
         #[ForeignKey(relationship: Relationship::MANY_TO_ONE, columnName: 't3_id')]
+        #[Searchable]
         public T3 $t3,
         #[Searchable]
         public string $v1
