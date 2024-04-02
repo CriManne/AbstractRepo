@@ -46,36 +46,39 @@ abstract class AbstractRepository
 
     /**
      * @param PDO $pdo
-     * @throws ReflectionException
      * @throws Exceptions\RepositoryException
      */
     function __construct(
         protected PDO $pdo
     )
     {
-        // If the repository doesn't implement IRepository it won't have the getModel method
-        if (!$this instanceof Interfaces\IRepository) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+        try {
+            // If the repository doesn't implement IRepository it won't have the getModel method
+            if (!$this instanceof Interfaces\IRepository) {
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
+            }
+
+            // Invoke the method to get the model handled by the repository (ex: Book)
+            $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
+
+            $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
+
+            // Check if the class implements Interfaces\IModel
+            if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
+            }
+
+            $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
+
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+            $this->modelHandler = new ModelHandler();
+
+            // Process the model
+            $this->processModel($modelReflectionClass);
+        } catch (Exception $e) {
+            throw new Exceptions\RepositoryException($e->getMessage());
         }
-
-        // Invoke the method to get the model handled by the repository (ex: Book)
-        $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
-
-        $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
-
-        // Check if the class implements Interfaces\IModel
-        if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
-        }
-
-        $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
-
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        $this->modelHandler = new ModelHandler();
-
-        // Process the model
-        $this->processModel($modelReflectionClass);
     }
 
     #region Private methods
@@ -166,7 +169,11 @@ abstract class AbstractRepository
             );
 
             if ($isSearchable) {
-                $this->modelHandler->addSearchableField($propertyName);
+                if ($typeOfFk !== null) {
+                    $this->modelHandler->addSearchableField($fkColumnName);
+                } else {
+                    $this->modelHandler->addSearchableField($propertyName);
+                }
             }
         }
     }
@@ -276,7 +283,22 @@ abstract class AbstractRepository
         $queryBuilder = new QueryBuilder();
 
         $keyProp = ReflectionUtility::getKeyProperty($this->modelClass);
-        $keyPropName = $keyProp->name;
+
+        $fkProperty = ReflectionUtility::getAttribute($keyProp, Attributes\ForeignKey::class);
+
+        // If it's a fk use the foreign key column name
+        if ($fkProperty !== null) {
+            $fkPropertyInstance = $fkProperty->newInstance();
+
+            $keyPropName = ReflectionUtility::invokeMethodOfClass(
+                get_class($fkPropertyInstance),
+                Attributes\ForeignKey::getColumnNameMethod,
+                $fkPropertyInstance
+            );
+        } else {
+            $keyPropName = $keyProp->name;
+        }
+
         $keyPropValue = $id;
 
         $queryBuilder
@@ -320,8 +342,12 @@ abstract class AbstractRepository
                         $fkKeyProperty = $fkKeyPropertyReflected->name;
                         $value = $model->$propertyName->$fkKeyProperty;
 
+                        // Take table name of the fk property
+                        $fkReflectedClass = ReflectionUtility::getReflectionClass($field->fieldType);
+                        $fkTableName = ReflectionUtility::getTableName($fkReflectedClass);
+
                         // Check if the ID is valid and therefore if there is a related record in the database
-                        $fkObj = $this->findById($value, $field->fieldType, $propertyName);
+                        $fkObj = $this->findById($value, $field->fieldType, $fkTableName);
 
                         if (!$fkObj) {
                             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
@@ -365,23 +391,34 @@ abstract class AbstractRepository
      * @param string $tableName
      * @param string $modelClass
      * @param string $property
-     * @param $value
+     * @param mixed $value
      * @return array|null
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
-    private function findWhere(string $tableName, string $modelClass, string $property, $value): ?array
+    private function findWhere(string $tableName, string $modelClass, string $property, mixed $value): ?array
     {
         $queryBuilder = (new QueryBuilder())
             ->select()
             ->from($tableName);
 
-        // Get the Attributes\Key property of the model
         $property = ReflectionUtility::getProperty($modelClass, $property);
 
-        // Get the name of the Attributes\Key
-        $propertyName = $property->getName();
+        $fkProperty = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+
+        // If it's a fk use the foreign key column name
+        if ($fkProperty !== null) {
+            $fkPropertyInstance = $fkProperty->newInstance();
+
+            $propertyName = ReflectionUtility::invokeMethodOfClass(
+                get_class($fkPropertyInstance),
+                Attributes\ForeignKey::getColumnNameMethod,
+                $fkPropertyInstance
+            );
+        } else {
+            $propertyName = $property->getName();
+        }
 
         // Get the PDO type of the property
         $idType = PDOUtil::getPDOType(strval($property->getType()));

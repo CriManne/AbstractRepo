@@ -49,6 +49,11 @@ class BaseTest extends TestCase
     public static T3Repository $t3Repo;
 
     /**
+     * @var T4Repository
+     */
+    public static T4Repository $t4Repo;
+
+    /**
      * @return void
      * @throws RepositoryException
      * @throws ReflectionException
@@ -65,6 +70,7 @@ class BaseTest extends TestCase
         self::$t1Repo = new T1Repository(self::$pdo);
         self::$t2Repo = new T2Repository(self::$pdo);
         self::$t3Repo = new T3Repository(self::$pdo);
+        self::$t4Repo = new T4Repository(self::$pdo);
     }
 
     /**
@@ -73,9 +79,10 @@ class BaseTest extends TestCase
     public function setUp(): void
     {
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-        self::$pdo->exec("TRUNCATE TABLE t1;");
-        self::$pdo->exec("TRUNCATE TABLE t2;");
-        self::$pdo->exec("TRUNCATE TABLE t3;");
+        self::$pdo->exec("TRUNCATE TABLE T1;");
+        self::$pdo->exec("TRUNCATE TABLE T2;");
+        self::$pdo->exec("TRUNCATE TABLE T3;");
+        self::$pdo->exec("TRUNCATE TABLE T4;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
