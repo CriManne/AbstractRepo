@@ -279,7 +279,22 @@ abstract class AbstractRepository
         $queryBuilder = new QueryBuilder();
 
         $keyProp = ReflectionUtility::getKeyProperty($this->modelClass);
-        $keyPropName = $keyProp->name;
+
+        $fkProperty = ReflectionUtility::getAttribute($keyProp, Attributes\ForeignKey::class);
+
+        // If it's a fk use the foreign key column name
+        if ($fkProperty !== null) {
+            $fkPropertyInstance = $fkProperty->newInstance();
+
+            $keyPropName = ReflectionUtility::invokeMethodOfClass(
+                get_class($fkPropertyInstance),
+                Attributes\ForeignKey::getColumnNameMethod,
+                $fkPropertyInstance
+            );
+        } else {
+            $keyPropName = $keyProp->name;
+        }
+
         $keyPropValue = $id;
 
         $queryBuilder
@@ -372,23 +387,34 @@ abstract class AbstractRepository
      * @param string $tableName
      * @param string $modelClass
      * @param string $property
-     * @param $value
+     * @param mixed $value
      * @return array|null
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
-    private function findWhere(string $tableName, string $modelClass, string $property, $value): ?array
+    private function findWhere(string $tableName, string $modelClass, string $property, mixed $value): ?array
     {
         $queryBuilder = (new QueryBuilder())
             ->select()
             ->from($tableName);
 
-        // Get the Attributes\Key property of the model
         $property = ReflectionUtility::getProperty($modelClass, $property);
 
-        // Get the name of the Attributes\Key
-        $propertyName = $property->getName();
+        $fkProperty = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+
+        // If it's a fk use the foreign key column name
+        if ($fkProperty !== null) {
+            $fkPropertyInstance = $fkProperty->newInstance();
+
+            $propertyName = ReflectionUtility::invokeMethodOfClass(
+                get_class($fkPropertyInstance),
+                Attributes\ForeignKey::getColumnNameMethod,
+                $fkPropertyInstance
+            );
+        } else {
+            $propertyName = $property->getName();
+        }
 
         // Get the PDO type of the property
         $idType = PDOUtil::getPDOType(strval($property->getType()));

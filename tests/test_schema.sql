@@ -23,3 +23,10 @@ CREATE TABLE T3(
      v1 varchar(255) not null,
      PRIMARY KEY(id)
 );
+
+CREATE TABLE T4(
+   t3_id varchar(255) not null,
+   v1 varchar(255) not null,
+   PRIMARY KEY(t3_id),
+   FOREIGN KEY(t3_id) REFERENCES T3(id)
+);
