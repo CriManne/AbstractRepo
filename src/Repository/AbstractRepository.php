@@ -23,7 +23,6 @@ use PDOStatement;
 use ReflectionClass;
 use ReflectionException;
 use Exception;
-use ReflectionParameter;
 
 /**
  * The abstract class from which extends the repository
@@ -90,7 +89,6 @@ abstract class AbstractRepository
      * @param ReflectionClass $reflectionClass
      * @return void
      * @throws ReflectionException
-     * @throws Exceptions\RepositoryException
      */
     private function processModel(ReflectionClass $reflectionClass): void
     {
@@ -133,6 +131,9 @@ abstract class AbstractRepository
                     );
                 }
 
+                // If it doesn't have a default value and is not a key identity then it's required
+                $isRequired = !$reflectionProperty->hasDefaultValue() && !$isIdentity;
+
                 // We get the ENUM type of Enums/Relationship if it is a foreign key and the column name
                 if ($attributeName === Attributes\ForeignKey::class) {
                     $typeOfFk = ReflectionUtility::invokeMethodOfClass(
@@ -149,30 +150,9 @@ abstract class AbstractRepository
                 }
             }
 
-            /**
-             * This check had to be made due to a bug/bad documentation of the method {@see ReflectionProperty::hasDefaultValue()}
-             * that doesn't work with promoted properties.
-             */
-            if (!$reflectionProperty->isPromoted()) {
-                // If it doesn't have a default value and is not a key identity then it's required
-                $isRequired = !$reflectionProperty->hasDefaultValue() && !$isIdentity;
-            } else {
-                /**
-                 * If it's a promoted property check the default value in the constructor by getting the reflection parameter
-                 */
-                $constructorParams = $reflectionClass->getConstructor()->getParameters();
-                $foundParams = array_values(array_filter($constructorParams, fn(ReflectionParameter $param) => $param->getName() === $reflectionProperty->getName()));
-
-                if (empty($foundParams) || count($foundParams) > 1) {
-                    throw new Exceptions\RepositoryException(Exceptions\RepositoryException::INVALID_PROMOTED_PROPERTY);
-                }
-
-                $isRequired = !($foundParams[0]->isDefaultValueAvailable()) && !$isIdentity;
-            }
-
             // Get property name and type
             $propertyName = $reflectionProperty->getName();
-            $propertyType = $reflectionProperty->getType()->getName();
+            $propertyType = strval($reflectionProperty->getType());
 
             $this->modelHandler->save(
                 fieldName: $propertyName,
