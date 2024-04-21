@@ -60,7 +60,7 @@ abstract class AbstractRepository
             }
 
             // Invoke the method to get the model handled by the repository (ex: Book)
-            $this->modelClass = ReflectionUtility::invokeMethodOfClass(get_class($this), "getModel", null);
+            $this->modelClass = $this->getModel();
 
             $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
 
@@ -135,30 +135,21 @@ abstract class AbstractRepository
                     $isSearchable = true;
                 }
 
-                // If is an identity we are not going to add it in the insert query
+                /**
+                 * @var Attributes\Key $attributeInstance
+                 */
                 if ($attributeName === Attributes\Key::class) {
                     $isKey = true;
-
-                    $isIdentity = ReflectionUtility::invokeMethodOfClass(
-                        get_class($attributeInstance),
-                        Attributes\Key::isIdentityMethod,
-                        $attributeInstance
-                    );
+                    $isIdentity = $attributeInstance->autoIncrement;
                 }
 
-                // We get the ENUM type of Enums/Relationship if it is a foreign key and the column name
+                /**
+                 * @var Attributes\ForeignKey $attributeInstance
+                 */
                 if ($attributeName === Attributes\ForeignKey::class) {
-                    $typeOfFk = ReflectionUtility::invokeMethodOfClass(
-                        get_class($attributeInstance),
-                        Attributes\ForeignKey::getRelationshipMethod,
-                        $attributeInstance
-                    );
+                    $typeOfFk = $attributeInstance->relationship;
 
-                    $fkColumnName = ReflectionUtility::invokeMethodOfClass(
-                        get_class($attributeInstance),
-                        Attributes\ForeignKey::getColumnNameMethod,
-                        $attributeInstance
-                    );
+                    $fkColumnName = $attributeInstance->columnName;
 
                     $keyProperty = ReflectionUtility::getKeyProperty($reflectionProperty->getType()->getName());
                     $fkColumnType = $keyProperty->getType()->getName();
@@ -438,16 +429,15 @@ abstract class AbstractRepository
         if ($modelClass !== $this->modelClass) {
             $property = ReflectionUtility::getProperty($modelClass, $property);
 
-            $fkProperty = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+            $fkAttribute = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
 
-            if ($fkProperty !== null) {
-                $fkPropertyInstance = $fkProperty->newInstance();
+            if ($fkAttribute !== null) {
+                /**
+                 * @var Attributes\ForeignKey $fkAttributeInstance
+                 */
+                $fkAttributeInstance = $fkAttribute->newInstance();
 
-                $propertyName = ReflectionUtility::invokeMethodOfClass(
-                    get_class($fkPropertyInstance),
-                    Attributes\ForeignKey::getColumnNameMethod,
-                    $fkPropertyInstance
-                );
+                $propertyName = $fkAttributeInstance->columnName;
 
                 $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
                 $propertyType = PDOUtil::getPDOType($keyProperty->getType()->getName());

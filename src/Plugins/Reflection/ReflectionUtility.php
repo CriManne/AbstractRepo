@@ -124,7 +124,7 @@ final class ReflectionUtility
     }
 
     /**
-     * Runs the method of the class passed
+     * Invoke the method of the class given.
      *
      * @param string $class
      * @param string $methodName
@@ -189,24 +189,23 @@ final class ReflectionUtility
      * @param ReflectionClass $reflectionClass
      * @return mixed
      * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
      */
     public static function getTableName(ReflectionClass $reflectionClass): string
     {
-        // Check if the model handled has the Attributes\Entity attribute
-        $entityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
+        /**
+         * Check if the model handled has the Attributes\Entity attribute
+         */
+        $reflectionEntityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
 
         // If there is no Attributes\Entity attribute it will trigger an Exceptions\RepositoryException
-        if (is_null($entityProperty)) {
+        if (!$reflectionEntityProperty) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_IS_NOT_ENTITY);
         }
+        /**
+         * @var Attributes\Entity $entityProperty
+         */
+        $entityProperty = $reflectionEntityProperty->newInstance();
 
-        $tableName = ReflectionUtility::invokeMethodOfClass(
-            get_class($entityProperty->newInstance()),
-            Attributes\Entity::getTableNameMethod,
-            $entityProperty->newInstance()
-        );
-
-        return $tableName ?? $reflectionClass->getShortName();
+        return $entityProperty->tableName;
     }
 }

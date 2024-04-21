@@ -9,5 +9,10 @@ namespace AbstractRepo\Interfaces;
  */
 interface IRepository
 {
+    /**
+     * Returns the name
+     */
+    public const string GET_MODEL_METHOD_NAME = 'getMode';
+
     static function getModel(): string;
 }

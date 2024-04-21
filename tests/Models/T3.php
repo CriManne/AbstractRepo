@@ -9,7 +9,7 @@ use AbstractRepo\Attributes\Key;
 use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity]
+#[Entity('T3')]
 class T3 implements IModel{
     public function __construct(
         #[Key(false)]

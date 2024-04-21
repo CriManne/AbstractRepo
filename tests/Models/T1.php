@@ -10,7 +10,7 @@ use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 use JetBrains\PhpStorm\Deprecated;
 
-#[Entity]
+#[Entity('T1')]
 class T1 implements IModel
 {
     public function __construct(

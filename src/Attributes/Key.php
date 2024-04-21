@@ -7,21 +7,17 @@ namespace AbstractRepo\Attributes;
 use Attribute;
 
 /**
- * Identifies a (primary) key property of an entity
+ * Attribute that identifies a property as a primary key.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 readonly final class Key
 {
-    public const isIdentityMethod = 'isIdentity';
-
     public function __construct(
-        public bool $identity = false
+        /**
+         * Flag that indicates whether the property is auto increment or not.
+         */
+        public bool $autoIncrement = false
     )
     {
-    }
-
-    public function isIdentity(): bool
-    {
-        return $this->identity;
     }
 }

@@ -11,7 +11,7 @@ use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity]
+#[Entity('T4')]
 class T4 implements IModel{
     public function __construct(
         #[Key(false)]
