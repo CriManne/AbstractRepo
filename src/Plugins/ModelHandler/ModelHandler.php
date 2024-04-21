@@ -2,22 +2,31 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\DataModels;
+namespace AbstractRepo\Plugins\ModelHandler;
 
-use AbstractRepo\DataModels;
+use AbstractRepo\DataModels\FieldInfo;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Repository\AbstractRepository;
 
 final class ModelHandler
 {
     /**
+     * All the fields handled
      * @var array[string]FieldInfo $fields
      */
     private array $fields;
 
     /**
+     * All the fields that are searchable, so that can be included in the {@see AbstractRepository::findByQuery()} methood
      * @var array
      */
     private array $searchableFields;
+
+    /**
+     * This field will be the reference to the key value of the model
+     * @var FieldInfo $fieldInfo
+     */
+    private FieldInfo $keyField;
 
     public function __construct(
     )
@@ -29,6 +38,10 @@ final class ModelHandler
     public function save(string $fieldName, FieldInfo $fieldInfo): void
     {
         $this->fields[$fieldName] = $fieldInfo;
+
+        if ($fieldInfo->isKey) {
+            $this->keyField = &$this->fields[$fieldName];
+        }
     }
 
     /**
@@ -41,13 +54,31 @@ final class ModelHandler
         return $this->fields[$fieldName] ?? throw new Exceptions\RepositoryException("Field {$fieldName} not found");
     }
 
+    /**
+     * Adds a searchable field
+     * @param string $fieldName
+     * @return void
+     */
     public function addSearchableField(string $fieldName): void
     {
         $this->searchableFields[] = $fieldName;
     }
 
+    /**
+     * Returns the searchable fields
+     * @return array
+     */
     public function getSearchableFields(): array
     {
         return $this->searchableFields;
+    }
+
+    /**
+     * Return the reference to the key value
+     * @return FieldInfo
+     */
+    public function getKey(): FieldInfo
+    {
+        return $this->keyField;
     }
 }

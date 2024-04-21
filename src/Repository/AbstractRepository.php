@@ -9,20 +9,20 @@ use AbstractRepo\DataModels\FetchedData;
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\DataModels\FieldInfo;
 use AbstractRepo\DataModels\ModelField;
-use AbstractRepo\DataModels\ModelHandler;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Interfaces;
 use AbstractRepo\Interfaces\IModel;
+use AbstractRepo\Plugins\ModelHandler\ModelHandler;
 use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
+use Exception;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
 use ReflectionException;
-use Exception;
 use ReflectionParameter;
 
 /**
@@ -91,6 +91,7 @@ abstract class AbstractRepository
      * @return void
      * @throws ReflectionException
      * @throws Exceptions\RepositoryException
+     * @throws Exceptions\ReflectionException
      */
     private function processModel(ReflectionClass $reflectionClass): void
     {
@@ -106,11 +107,21 @@ abstract class AbstractRepository
             // Flag to check if is fk and which type
             $typeOfFk = null;
 
-            // If the column name of the fk is specified we store it
+            /**
+             * The name of the reference column by the fk
+             */
             $fkColumnName = null;
+
+            /**
+             * The type of the reference column by the fk
+             */
+            $fkColumnType = null;
 
             // If the property is searchable
             $isSearchable = false;
+
+            // If the property is key
+            $isKey = false;
 
             // Attributes of the property
             $attributes = $reflectionProperty->getAttributes();
@@ -126,6 +137,8 @@ abstract class AbstractRepository
 
                 // If is an identity we are not going to add it in the insert query
                 if ($attributeName === Attributes\Key::class) {
+                    $isKey = true;
+
                     $isIdentity = ReflectionUtility::invokeMethodOfClass(
                         get_class($attributeInstance),
                         Attributes\Key::isIdentityMethod,
@@ -146,6 +159,9 @@ abstract class AbstractRepository
                         Attributes\ForeignKey::getColumnNameMethod,
                         $attributeInstance
                     );
+
+                    $keyProperty = ReflectionUtility::getKeyProperty($reflectionProperty->getType()->getName());
+                    $fkColumnType = $keyProperty->getType()->getName();
                 }
             }
 
@@ -180,11 +196,13 @@ abstract class AbstractRepository
                     fieldName: $propertyName,
                     fieldType: $propertyType,
                     isRequired: $isRequired,
+                    isKey: $isKey,
                     isIdentity: $isIdentity,
                     isFk: $typeOfFk !== null,
                     defaultValue: $reflectionProperty->getDefaultValue(),
-                    fkType: $typeOfFk,
-                    fkColumnName: $fkColumnName
+                    relationshipType: $typeOfFk,
+                    fkColumnName: $fkColumnName,
+                    fkColumnType: $fkColumnType
                 )
             );
 
@@ -263,9 +281,9 @@ abstract class AbstractRepository
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
         }
 
-        $keyProp = ReflectionUtility::getKeyProperty($model::class);
-        $keyPropName = $keyProp->name;
-        $keyPropValue = $keyProp->getValue($model);
+        $keyProp = $this->modelHandler->getKey();
+        $keyPropName = $keyProp->fieldName;
+        $keyPropValue = $model->$keyPropName;
 
         // Get the update string (ex: col1 = :col1, col2 = :col2)
         $nonPkColumns = [];
@@ -295,28 +313,18 @@ abstract class AbstractRepository
      *
      * @param $id
      * @return PDOStatement
-     * @throws Exceptions\ReflectionException
-     * @throws ReflectionException
      */
     private function getDeleteStatement($id): PDOStatement
     {
         $queryBuilder = new QueryBuilder();
 
-        $keyProp = ReflectionUtility::getKeyProperty($this->modelClass);
-
-        $fkProperty = ReflectionUtility::getAttribute($keyProp, Attributes\ForeignKey::class);
+        $keyProp = $this->modelHandler->getKey();
 
         // If it's a fk use the foreign key column name
-        if ($fkProperty !== null) {
-            $fkPropertyInstance = $fkProperty->newInstance();
-
-            $keyPropName = ReflectionUtility::invokeMethodOfClass(
-                get_class($fkPropertyInstance),
-                Attributes\ForeignKey::getColumnNameMethod,
-                $fkPropertyInstance
-            );
+        if ($keyProp->isFk) {
+            $keyPropName = $keyProp->fkColumnName;
         } else {
-            $keyPropName = $keyProp->name;
+            $keyPropName = $keyProp->fieldName;
         }
 
         $keyPropValue = $id;
@@ -354,9 +362,9 @@ abstract class AbstractRepository
             if (!$field->isIdentity) {
 
                 // If is a fk
-                if ($field->fkType) {
+                if ($field->isFk) {
 
-                    if ($field->fkType == Enums\Relationship::MANY_TO_ONE || $field->fkType == Enums\Relationship::ONE_TO_ONE) {
+                    if ($field->relationshipType == Enums\Relationship::MANY_TO_ONE || $field->relationshipType == Enums\Relationship::ONE_TO_ONE) {
                         // It takes the value of the fk from the model
                         $fkKeyPropertyReflected = ReflectionUtility::getKeyProperty($field->fieldType);
                         $fkKeyProperty = $fkKeyPropertyReflected->name;
@@ -413,9 +421,9 @@ abstract class AbstractRepository
      * @param string $property
      * @param mixed $value
      * @return array|null
-     * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
+     * @throws Exceptions\ReflectionException
      */
     private function findWhere(string $tableName, string $modelClass, string $property, mixed $value): ?array
     {
@@ -423,31 +431,47 @@ abstract class AbstractRepository
             ->select()
             ->from($tableName);
 
-        $property = ReflectionUtility::getProperty($modelClass, $property);
+        /**
+         * If this is true {$modelClass !== $this->modelClass}, it means that the model passed is not the same as
+         * the one handled by the repository. So we have to check on the other model
+         */
+        if ($modelClass !== $this->modelClass) {
+            $property = ReflectionUtility::getProperty($modelClass, $property);
 
-        $fkProperty = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+            $fkProperty = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
 
-        // If it's a fk use the foreign key column name
-        if ($fkProperty !== null) {
-            $fkPropertyInstance = $fkProperty->newInstance();
+            if ($fkProperty !== null) {
+                $fkPropertyInstance = $fkProperty->newInstance();
 
-            $propertyName = ReflectionUtility::invokeMethodOfClass(
-                get_class($fkPropertyInstance),
-                Attributes\ForeignKey::getColumnNameMethod,
-                $fkPropertyInstance
-            );
+                $propertyName = ReflectionUtility::invokeMethodOfClass(
+                    get_class($fkPropertyInstance),
+                    Attributes\ForeignKey::getColumnNameMethod,
+                    $fkPropertyInstance
+                );
+
+                $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
+                $propertyType = PDOUtil::getPDOType($keyProperty->getType()->getName());
+            } else {
+                $propertyName = $property->getName();
+                $propertyType = PDOUtil::getPDOType($property->getType()->getName());
+            }
         } else {
-            $propertyName = $property->getName();
-        }
+            $property = $this->modelHandler->get($property);
 
-        // Get the PDO type of the property
-        $idType = PDOUtil::getPDOType(strval($property->getType()));
+            if ($property->isFk) {
+                $propertyName = $property->fkColumnName;
+                $propertyType = PDOUtil::getPDOType($property->fkColumnType);
+            } else {
+                $propertyName = $property->fieldName;
+                $propertyType = PDOUtil::getPDOType($property->fieldType);
+            }
+        }
 
         $queryBuilder->where("{$propertyName} = " . QueryBuilder::BIND_CHAR . "{$propertyName}");
 
         // Prepares, binds, executes and fetch the query
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
-        $stmt->bindParam(QueryBuilder::BIND_CHAR . $propertyName, $value, $idType);
+        $stmt->bindParam(QueryBuilder::BIND_CHAR . $propertyName, $value, $propertyType);
         $stmt->execute();
         $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
 
@@ -747,7 +771,7 @@ abstract class AbstractRepository
             // Set id to the saved model
             $key = ReflectionUtility::getKeyProperty($this->modelClass);
 
-            $keyField = $this->modelHandler->get($key->getName());
+            $keyField = $this->modelHandler->getKey();
 
             if ($keyField->isIdentity) {
                 $key->setValue($model, $this->pdo->lastInsertId());
