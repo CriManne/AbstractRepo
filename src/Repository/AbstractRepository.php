@@ -11,6 +11,7 @@ use AbstractRepo\DataModels\FieldInfo;
 use AbstractRepo\DataModels\ModelField;
 use AbstractRepo\Enums;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Interfaces;
 use AbstractRepo\Interfaces\IModel;
 use AbstractRepo\Plugins\ModelHandler\ModelHandler;
@@ -26,22 +27,25 @@ use ReflectionException;
 use ReflectionParameter;
 
 /**
- * The abstract class from which extends the repository
+ * This abstract class allows to extend a custom repository layer and, by choosing a model, to have the basic
+ * CRUD functionalities already implemented.
  */
 abstract class AbstractRepository
 {
     /**
-     * @var string|mixed The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
+     * The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
+     * @var string|mixed
      */
-    private string $modelClass;
+    private string $modelClassPathName;
 
     /**
-     * @var string|mixed The name of the table in which the model is stored
+     * The name of the database table of the handled model.
+     * @var string|mixed
      */
     private string $tableName;
 
     /**
-     * @var ModelHandler The models handler
+     * @var ModelHandler
      */
     private ModelHandler $modelHandler;
 
@@ -54,18 +58,24 @@ abstract class AbstractRepository
     )
     {
         try {
-            // If the repository doesn't implement IRepository it won't have the getModel method
+            /**
+             * Throw error if the repository doesn't implement {@see Interfaces\IRepository}.
+             */
             if (!$this instanceof Interfaces\IRepository) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
             }
 
-            // Invoke the method to get the model handled by the repository (ex: Book)
-            $this->modelClass = $this->getModel();
+            /**
+             * Invoke the method to get the model handled by the repository (ex: Book).
+             */
+            $this->modelClassPathName = $this->getModel();
 
-            $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClass);
+            $modelReflectionClass = ReflectionUtility::getReflectionClass($this->modelClassPathName);
 
-            // Check if the class implements Interfaces\IModel
-            if (!ReflectionUtility::class_implements($this->modelClass, Interfaces\IModel::class)) {
+            /**
+             * Throw error if the model doesn't implement {@see Interfaces\IModel}.
+             */
+            if (!ReflectionUtility::class_implements($this->modelClassPathName, Interfaces\IModel::class)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
             }
 
@@ -75,8 +85,10 @@ abstract class AbstractRepository
 
             $this->modelHandler = new ModelHandler();
 
-            // Process the model
-            $this->processModel($modelReflectionClass);
+            $this->processModel(
+                reflectionClass: $modelReflectionClass,
+                modelHandler: $this->modelHandler
+            );
         } catch (Exception $e) {
             throw new Exceptions\RepositoryException($e->getMessage());
         }
@@ -85,15 +97,16 @@ abstract class AbstractRepository
     #region Private methods
 
     /**
-     * Analyze the model class
+     * Method to analyze the model given and
      *
      * @param ReflectionClass $reflectionClass
+     * @param ModelHandler $modelHandler
      * @return void
-     * @throws ReflectionException
-     * @throws Exceptions\RepositoryException
      * @throws Exceptions\ReflectionException
+     * @throws RepositoryException
+     * @throws ReflectionException
      */
-    private function processModel(ReflectionClass $reflectionClass): void
+    private function processModel(ReflectionClass $reflectionClass, ModelHandler $modelHandler): void
     {
         $reflectionProperties = $reflectionClass->getProperties();
 
@@ -181,7 +194,7 @@ abstract class AbstractRepository
             $propertyName = $reflectionProperty->getName();
             $propertyType = $reflectionProperty->getType()->getName();
 
-            $this->modelHandler->save(
+            $modelHandler->save(
                 fieldName: $propertyName,
                 fieldInfo: new FieldInfo(
                     fieldName: $propertyName,
@@ -199,9 +212,9 @@ abstract class AbstractRepository
 
             if ($isSearchable) {
                 if ($typeOfFk !== null) {
-                    $this->modelHandler->addSearchableField($fkColumnName);
+                    $modelHandler->addSearchableField($fkColumnName);
                 } else {
-                    $this->modelHandler->addSearchableField($propertyName);
+                    $modelHandler->addSearchableField($propertyName);
                 }
             }
         }
@@ -216,7 +229,7 @@ abstract class AbstractRepository
      */
     private function validateRequest(Interfaces\IModel $model): void
     {
-        if (get_class($model) !== $this->modelClass) {
+        if (get_class($model) !== $this->modelClassPathName) {
             throw new Exceptions\RepositoryException("The model is not handled by the repository.");
         }
     }
@@ -426,7 +439,7 @@ abstract class AbstractRepository
          * If this is true {$modelClass !== $this->modelClass}, it means that the model passed is not the same as
          * the one handled by the repository. So we have to check on the other model
          */
-        if ($modelClass !== $this->modelClass) {
+        if ($modelClass !== $this->modelClassPathName) {
             $property = ReflectionUtility::getProperty($modelClass, $property);
 
             $fkAttribute = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
@@ -627,7 +640,7 @@ abstract class AbstractRepository
             $mappedArr = [];
 
             foreach ($arr as $item) {
-                $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClass);
+                $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClassPathName);
             }
 
             if ($isPaginated) {
@@ -722,7 +735,7 @@ abstract class AbstractRepository
         try {
             // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
             // called with different modelClasses and tableNames
-            $modelClass = $class ?? $this->modelClass;
+            $modelClass = $class ?? $this->modelClassPathName;
             $tableName = $table ?? $this->tableName;
 
             // Get the Attributes\Key property of the model
@@ -759,7 +772,7 @@ abstract class AbstractRepository
             $stmt->execute();
 
             // Set id to the saved model
-            $key = ReflectionUtility::getKeyProperty($this->modelClass);
+            $key = ReflectionUtility::getKeyProperty($this->modelClassPathName);
 
             $keyField = $this->modelHandler->getKey();
 

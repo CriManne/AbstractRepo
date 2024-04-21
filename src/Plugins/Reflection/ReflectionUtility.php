@@ -164,7 +164,9 @@ final class ReflectionUtility
     public static function class_implements(string $className, string $interfaceName): bool
     {
         foreach (class_implements($className) as $interface) {
-            if ($interface == $interfaceName) return true;
+            if ($interface == $interfaceName) {
+                return true;
+            }
         }
 
         return false;
