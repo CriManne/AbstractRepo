@@ -15,11 +15,13 @@ final class FieldInfo
         public string              $fieldName,
         public ?string             $fieldType,
         public bool                $isRequired,
+        public bool                $isKey,
         public bool                $isIdentity,
         public bool                $isFk,
         public mixed               $defaultValue = null,
-        public ?Enums\Relationship $fkType = null,
-        public ?string             $fkColumnName = null
+        public ?Enums\Relationship $relationshipType = null,
+        public ?string             $fkColumnName = null,
+        public ?string             $fkColumnType = null
     )
     {
     }
