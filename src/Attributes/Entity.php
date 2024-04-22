@@ -14,7 +14,7 @@ final readonly class Entity
 {
     public function __construct(
         /**
-         * Name of the database table related to the entity.
+         * @var string $tableName Name of the database table related to the entity.
          */
         public string $tableName
     )

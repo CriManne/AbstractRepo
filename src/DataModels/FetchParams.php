@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace AbstractRepo\DataModels;
 
+/**
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
+ */
 final class FetchParams
 {
     /**

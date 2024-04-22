@@ -10,11 +10,11 @@ use Attribute;
  * Attribute that identifies a property as a primary key.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-readonly final class Key
+readonly final class PrimaryKey
 {
     public function __construct(
         /**
-         * Flag that indicates whether the property is auto increment or not.
+         * @var bool $autoIncrement Flag that indicates whether the property is auto increment or not.
          */
         public bool $autoIncrement = false
     )

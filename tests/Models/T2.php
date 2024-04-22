@@ -6,14 +6,14 @@ namespace AbstractRepo\Test\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
-use AbstractRepo\Attributes\Key;
+use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T2')]
 class T2 implements IModel{
     public function __construct(
-        #[Key(false)]
+        #[PrimaryKey(false)]
         public int $id,
         public string $v1,
         #[ForeignKey(

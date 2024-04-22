@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Plugins\QueryBuilder;
 
-use AbstractRepo\Plugins\Types\StringUtil;
+use AbstractRepo\Plugins\Utils\StringUtil;
 
+/**
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
+ */
 class QueryBuilder
 {
     public const BIND_CHAR = ':';

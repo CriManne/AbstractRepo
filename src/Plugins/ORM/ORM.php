@@ -12,6 +12,7 @@ use ReflectionException;
 
 /**
  * Utility class used for ORM operations
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ORM{
 

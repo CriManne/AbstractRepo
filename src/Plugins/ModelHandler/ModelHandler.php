@@ -8,6 +8,9 @@ use AbstractRepo\DataModels\FieldInfo;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Repository\AbstractRepository;
 
+/**
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
+ */
 final class ModelHandler
 {
     /**
@@ -39,18 +42,22 @@ final class ModelHandler
     {
         $this->fields[$fieldName] = $fieldInfo;
 
-        if ($fieldInfo->isKey) {
+        if ($fieldInfo->isPrimaryKey) {
             $this->keyField = &$this->fields[$fieldName];
         }
     }
 
     /**
-     * @param string $fieldName
-     * @return FieldInfo
+     * @param ?string $fieldName
+     * @return FieldInfo|FieldInfo[]
      * @throws Exceptions\RepositoryException
      */
-    public function get(string $fieldName): FieldInfo
+    public function get(?string $fieldName = null): FieldInfo|array
     {
+        if (!$fieldName) {
+            return $this->fields;
+        }
+
         return $this->fields[$fieldName] ?? throw new Exceptions\RepositoryException("Field {$fieldName} not found");
     }
 

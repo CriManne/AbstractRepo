@@ -8,6 +8,7 @@ use Exception;
 
 /**
  * Triggered in reflection operations
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ReflectionException extends Exception
 {

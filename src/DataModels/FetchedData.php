@@ -7,6 +7,9 @@ namespace AbstractRepo\DataModels;
 use AbstractRepo\Interfaces\IModel;
 use JsonSerializable;
 
+/**
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
+ */
 final readonly class FetchedData implements JsonSerializable
 {
     /**

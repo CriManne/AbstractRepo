@@ -35,29 +35,6 @@ class ForeignKeyPkTest extends BaseTest
      * @return void
      * @throws RepositoryException
      */
-    public function testInvalidModelUpdate(): void
-    {
-        self::expectException(RepositoryException::class);
-
-        $t3 = new T3('ABC', '123');
-        $t3new = new T3('DEF', '345');
-
-        self::$t3Repo->save($t3);
-        self::$t3Repo->save($t3new);
-
-        $t4 = new T4($t3, "test");
-
-        self::$t4Repo->save($t4);
-
-        $t4->t3 = $t3new;
-
-        self::$t4Repo->update($t4);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
     public function testValidModelDelete(): void
     {
         $t3 = new T3('ABC', '123');

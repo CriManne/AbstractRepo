@@ -7,7 +7,7 @@ namespace AbstractRepo\Plugins\PDO;
 class PDOUtil
 {
     /**
-     * Returns the PDO type from the PHP type
+     * Returns the PDO type from the PHP type.
      *
      * @param string $type
      * @return int

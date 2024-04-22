@@ -24,13 +24,12 @@ use PDO;
 use PDOStatement;
 use ReflectionClass;
 use ReflectionException;
-use ReflectionParameter;
 
 /**
  * This abstract class allows to extend a custom repository layer and, by choosing a model, to have the basic
  * CRUD functionalities already implemented.
  */
-abstract class AbstractRepository
+abstract class AbstractRepository implements Interfaces\IRepository
 {
     /**
      * The class of the model handled by the repository (ex: AbstractRepo\Models\Book)
@@ -50,6 +49,12 @@ abstract class AbstractRepository
     private ModelHandler $modelHandler;
 
     /**
+     * {@inheritDoc}
+     * @return string
+     */
+    abstract static public function getModel(): string;
+
+    /**
      * @param PDO $pdo
      * @throws Exceptions\RepositoryException
      */
@@ -58,13 +63,6 @@ abstract class AbstractRepository
     )
     {
         try {
-            /**
-             * Throw error if the repository doesn't implement {@see Interfaces\IRepository}.
-             */
-            if (!$this instanceof Interfaces\IRepository) {
-                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::REPOSITORY_MUST_IMPLEMENTS);
-            }
-
             /**
              * Invoke the method to get the model handled by the repository (ex: Book).
              */
@@ -97,7 +95,7 @@ abstract class AbstractRepository
     #region Private methods
 
     /**
-     * Method to analyze the model given and
+     * Method to analyze the model given and store with the model handler the basic information of it.
      *
      * @param ReflectionClass $reflectionClass
      * @param ModelHandler $modelHandler
@@ -111,61 +109,76 @@ abstract class AbstractRepository
         $reflectionProperties = $reflectionClass->getProperties();
 
         foreach ($reflectionProperties as $reflectionProperty) {
-            // Flag to see if a property is identity, so it doesn't need to be inserted
-            $isIdentity = false;
+            $propertyName = $reflectionProperty->getName();
+            $propertyType = $reflectionProperty->getType()->getName();
 
-            // Flag to check if is required
+            /**
+             * Stores whether a property is autoIncrement or not.
+             * Used to determine whether it's needed to be inserted or not.
+             */
+            $isAutoIncrement = false;
+
+            /**
+             * Stores whether a property is required.
+             */
             $isRequired = false;
 
-            // Flag to check if is fk and which type
-            $typeOfFk = null;
+            /**
+             * Stores the foreign key type
+             * @var Enums\Relationship|null $foreignKeyRelationshipType
+             */
+            $foreignKeyRelationshipType = null;
 
             /**
-             * The name of the reference column by the fk
+             * Stores the name of the foreign key referenced column
              */
-            $fkColumnName = null;
+            $foreignKeyColumnName = null;
 
             /**
-             * The type of the reference column by the fk
+             * Stores the type of the foreign key referenced column
              */
-            $fkColumnType = null;
+            $foreignKeyColumnType = null;
 
-            // If the property is searchable
+            /**
+             * Stores whether a property is searchable by the {@see self::findByQuery()} method.
+             */
             $isSearchable = false;
 
-            // If the property is key
-            $isKey = false;
+            /**
+             * Stores whether a property is primary key.
+             */
+            $isPrimaryKey = false;
 
-            // Attributes of the property
-            $attributes = $reflectionProperty->getAttributes();
+            $propertyAttributes = $reflectionProperty->getAttributes();
 
-            foreach ($attributes as $attribute) {
+            foreach ($propertyAttributes as $attribute) {
                 $attributeInstance = $attribute->newInstance();
                 $attributeName = $attribute->getName();
 
-                // If the property is searchable
+                /**
+                 * @var Attributes\Searchable $attributeInstance
+                 */
                 if ($attributeName === Attributes\Searchable::class) {
                     $isSearchable = true;
                 }
 
                 /**
-                 * @var Attributes\Key $attributeInstance
+                 * @var Attributes\PrimaryKey $attributeInstance
                  */
-                if ($attributeName === Attributes\Key::class) {
-                    $isKey = true;
-                    $isIdentity = $attributeInstance->autoIncrement;
+                if ($attributeName === Attributes\PrimaryKey::class) {
+                    $isPrimaryKey = true;
+                    $isAutoIncrement = $attributeInstance->autoIncrement;
                 }
 
                 /**
                  * @var Attributes\ForeignKey $attributeInstance
                  */
                 if ($attributeName === Attributes\ForeignKey::class) {
-                    $typeOfFk = $attributeInstance->relationship;
+                    $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($propertyType);
 
-                    $fkColumnName = $attributeInstance->columnName;
-
-                    $keyProperty = ReflectionUtility::getKeyProperty($reflectionProperty->getType()->getName());
-                    $fkColumnType = $keyProperty->getType()->getName();
+                    $foreignKeyRelationshipType = $attributeInstance->relationship;
+                    $foreignKeyColumnName = $attributeInstance->columnName;
+                    $foreignKeyColumnType = $primaryKeyProperty->getType()->getName();
                 }
             }
 
@@ -174,45 +187,48 @@ abstract class AbstractRepository
              * that doesn't work with promoted properties.
              */
             if (!$reflectionProperty->isPromoted()) {
-                // If it doesn't have a default value and is not a key identity then it's required
-                $isRequired = !$reflectionProperty->hasDefaultValue() && !$isIdentity;
+                /**
+                 * If it doesn't have a default value and is not a key identity then it's required
+                 */
+                $isRequired = !$reflectionProperty->hasDefaultValue() && !$isAutoIncrement;
             } else {
                 /**
                  * If it's a promoted property check the default value in the constructor by getting the reflection parameter
                  */
-                $constructorParams = $reflectionClass->getConstructor()->getParameters();
-                $foundParams = array_values(array_filter($constructorParams, fn(ReflectionParameter $param) => $param->getName() === $reflectionProperty->getName()));
+                $constructorParameter = ReflectionUtility::getConstructorParameter(
+                    reflectionClass: $reflectionClass,
+                    parameterName: $propertyName
+                );
 
-                if (empty($foundParams) || count($foundParams) > 1) {
+                if (!$constructorParameter) {
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::INVALID_PROMOTED_PROPERTY);
                 }
 
-                $isRequired = !($foundParams[0]->isDefaultValueAvailable()) && !$isIdentity;
+                /**
+                 * If there's no default value in the promoted property, and it's not auto increment then it's required.
+                 */
+                $isRequired = !$constructorParameter->isDefaultValueAvailable() && !$isAutoIncrement;
             }
-
-            // Get property name and type
-            $propertyName = $reflectionProperty->getName();
-            $propertyType = $reflectionProperty->getType()->getName();
 
             $modelHandler->save(
                 fieldName: $propertyName,
                 fieldInfo: new FieldInfo(
-                    fieldName: $propertyName,
-                    fieldType: $propertyType,
+                    propertyName: $propertyName,
+                    propertyType: $propertyType,
                     isRequired: $isRequired,
-                    isKey: $isKey,
-                    isIdentity: $isIdentity,
-                    isFk: $typeOfFk !== null,
+                    isPrimaryKey: $isPrimaryKey,
+                    autoIncrement: $isAutoIncrement,
+                    isForeignKey: $foreignKeyRelationshipType !== null,
                     defaultValue: $reflectionProperty->getDefaultValue(),
-                    relationshipType: $typeOfFk,
-                    fkColumnName: $fkColumnName,
-                    fkColumnType: $fkColumnType
+                    foreignKeyRelationshipType: $foreignKeyRelationshipType,
+                    foreignKeyColumnName: $foreignKeyColumnName,
+                    foreignKeyColumnType: $foreignKeyColumnType
                 )
             );
 
             if ($isSearchable) {
-                if ($typeOfFk !== null) {
-                    $modelHandler->addSearchableField($fkColumnName);
+                if ($foreignKeyRelationshipType !== null) {
+                    $modelHandler->addSearchableField($foreignKeyColumnName);
                 } else {
                     $modelHandler->addSearchableField($propertyName);
                 }
@@ -221,7 +237,56 @@ abstract class AbstractRepository
     }
 
     /**
-     * Validates the model sent in the request
+     * Recursive function to retrieve the primary key value.
+     *
+     * @param IModel $model
+     * @param string $fieldName
+     * @return mixed
+     * @throws ReflectionException
+     * @throws Exceptions\ReflectionException
+     * @throws RepositoryException
+     */
+    private function getForeignKeyValue(
+        IModel $model,
+        string $fieldName
+    ): mixed
+    {
+        $value = $model->$fieldName;
+
+        if (!is_object($value)) {
+            return $value;
+        }
+
+        /**
+         * Get reflection class of the related object
+         */
+        $reflectionClassObject = new ReflectionClass($value);
+
+        /**
+         * Get primary key and primary key field name
+         */
+        $primaryKeyField = ReflectionUtility::getPrimaryKeyProperty($reflectionClassObject);
+        $primaryKeyFieldName = $primaryKeyField->getName();
+
+        /**
+         * Get table name of the related object
+         */
+        $tableName = ReflectionUtility::getTableName($reflectionClassObject);
+
+        /**
+         * Find the related object to ensure that there are no orphan data.
+         */
+        $object = $this->findById($value->$primaryKeyFieldName, $reflectionClassObject->getName(), $tableName);
+
+        if (!$object) {
+            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+        }
+
+        return $this->getForeignKeyValue($object, $primaryKeyFieldName);
+    }
+
+    /**
+     * Validates the model sent in the request.
      *
      * @param IModel $model
      * @return void
@@ -230,71 +295,97 @@ abstract class AbstractRepository
     private function validateRequest(Interfaces\IModel $model): void
     {
         if (get_class($model) !== $this->modelClassPathName) {
-            throw new Exceptions\RepositoryException("The model is not handled by the repository.");
+            throw new Exceptions\RepositoryException(RepositoryException::MODEL_IS_NOT_HANDLED);
         }
     }
 
     /**
-     * Returns the PDOStatement for the insert operation
+     * Returns the PDOStatement for the insert operation.
      *
      * @param IModel $model
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
-     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
+     * @throws Exceptions\RepositoryException
      */
     private function getInsertStatement(Interfaces\IModel $model): PDOStatement
     {
         $queryBuilder = new QueryBuilder();
 
-        // Get the values array to get each value from the model
-        $values = $this->getValuesFromModel($model);
+        /**
+         * Retrieves all the data from the given model.
+         */
+        $modelData = $this->getModelData($model);
 
-        if (count($values) == 0) {
+        if (count($modelData) == 0) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
         }
 
-        // Get an array with just the columns names
-        $columns = array_map(fn(ModelField $val) => $val->fieldName, $values);
+        /**
+         * Get an array with just the columns names
+         */
+        $columns = array_map(fn(ModelField $val) => $val->fieldName, $modelData);
 
+        /**
+         * Create the insert statement with the bind params
+         * E.g.
+         * INSERT INTO t1 (col) VALUES (:col)
+         */
         $queryBuilder->insert($this->tableName, $columns);
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        // For each placeholder (:colName) bind the param with its type
-        return $this->bindValues($values, $stmt);
+        /**
+         * Bind the data to the placeholders.
+         */
+        return $this->bindValues($modelData, $stmt);
     }
 
     /**
-     * Returns the PDOStatement for the update operation
+     * Returns the PDOStatement for the update operation.
      *
      * @param IModel $model
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
-     * @throws Exceptions\RepositoryException If the model has no valid fields to take the data from
+     * @throws Exceptions\RepositoryException
      */
     private function getUpdateStatement(Interfaces\IModel $model): PDOStatement
     {
         $queryBuilder = new QueryBuilder();
 
-        // Get the values array to get each value from the model
-        $values = $this->getValuesFromModel($model);
+        /**
+         * Retrieves all the data from the given model.
+         */
+        $modelData = $this->getModelData($model);
 
-        if (count($values) == 0) {
+        if (count($modelData) == 0) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
         }
 
         $keyProp = $this->modelHandler->getKey();
-        $keyPropName = $keyProp->fieldName;
-        $keyPropValue = $model->$keyPropName;
 
-        // Get the update string (ex: col1 = :col1, col2 = :col2)
+        /**
+         * @var string $keyPropName Is used to identify the primary key later in the foreach
+         */
+        if ($keyProp->isForeignKey) {
+            $keyPropName = $keyProp->foreignKeyColumnName;
+        } else {
+            $keyPropName = $keyProp->propertyName;
+        }
+
+        /**
+         * Get the update string (ex: col1 = :col1, col2 = :col2) without the primary key since it can't be updated.
+         */
         $nonPkColumns = [];
 
-        foreach ($values as $val) {
-            if ($val->fieldName !== $keyPropName) {
-                $nonPkColumns[] = $val->fieldName;
+        $keyPropValue = null;
+
+        foreach ($modelData as $field) {
+            if ($field->fieldName !== $keyPropName) {
+                $nonPkColumns[] = $field->fieldName;
+            } else {
+                $keyPropValue = $field->fieldValue;
             }
         }
 
@@ -304,8 +395,10 @@ abstract class AbstractRepository
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        // Bind values to the statement and also for the where id = :id
-        $stmt = $this->bindValues($values, $stmt);
+        /**
+         * Bind values to the statement and also for the where id = :id
+         */
+        $stmt = $this->bindValues($modelData, $stmt);
 
         $stmt->bindParam($keyPropName, $keyPropValue, PDOUtil::getPDOType(gettype($keyPropValue)));
 
@@ -313,7 +406,7 @@ abstract class AbstractRepository
     }
 
     /**
-     * Returns the PDOStatement for the delete operation
+     * Returns the PDOStatement for the delete operation.
      *
      * @param $id
      * @return PDOStatement
@@ -324,11 +417,13 @@ abstract class AbstractRepository
 
         $keyProp = $this->modelHandler->getKey();
 
-        // If it's a fk use the foreign key column name
-        if ($keyProp->isFk) {
-            $keyPropName = $keyProp->fkColumnName;
+        /**
+         * If it's a fk use the foreign key column name
+         */
+        if ($keyProp->isForeignKey) {
+            $keyPropName = $keyProp->foreignKeyColumnName;
         } else {
-            $keyPropName = $keyProp->fieldName;
+            $keyPropName = $keyProp->propertyName;
         }
 
         $keyPropValue = $id;
@@ -345,7 +440,7 @@ abstract class AbstractRepository
     }
 
     /**
-     * Returns an array used in the insert an update operation to get every value of the object
+     * Returns an array used in the insert an update operation to get every value of the object.
      *
      * @param Interfaces\IModel $model
      * @return ModelField[]
@@ -353,66 +448,51 @@ abstract class AbstractRepository
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
-    private function getValuesFromModel(Interfaces\IModel $model): array
+    private function getModelData(Interfaces\IModel $model): array
     {
         $values = [];
 
-        foreach ($model as $propertyName => $value) {
-            $field = $this->modelHandler->get($propertyName);
+        foreach ($this->modelHandler->get() as $property) {
+            $propertyName = $property->propertyName;
+            $propertyType = $property->propertyType;
 
-            $propertyType = $field->fieldType;
+            if ($property->isForeignKey) {
 
-            // If it's not an identity
-            if (!$field->isIdentity) {
+                if ($property->foreignKeyRelationshipType == Enums\Relationship::MANY_TO_ONE
+                    || $property->foreignKeyRelationshipType == Enums\Relationship::ONE_TO_ONE) {
 
-                // If is a fk
-                if ($field->isFk) {
+                    /**
+                     * Recursively checks in the nested foreign key objects for the value.
+                     * E.g.
+                     * The primary key of T1 is T2, and the primary key of T2 is T3.
+                     * Then to get the value of the foreign key T2 in T1 we need to fetch the value of the primary key of T3.
+                     */
+                    $value = $this->getForeignKeyValue($model, $propertyName);
 
-                    if ($field->relationshipType == Enums\Relationship::MANY_TO_ONE || $field->relationshipType == Enums\Relationship::ONE_TO_ONE) {
-                        // It takes the value of the fk from the model
-                        $fkKeyPropertyReflected = ReflectionUtility::getKeyProperty($field->fieldType);
-                        $fkKeyProperty = $fkKeyPropertyReflected->name;
-                        $value = $model->$propertyName->$fkKeyProperty;
-
-                        // Take table name of the fk property
-                        $fkReflectedClass = ReflectionUtility::getReflectionClass($field->fieldType);
-                        $fkTableName = ReflectionUtility::getTableName($fkReflectedClass);
-
-                        // Check if the ID is valid and therefore if there is a related record in the database
-                        $fkObj = $this->findById($value, $field->fieldType, $fkTableName);
-
-                        if (!$fkObj) {
-                            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
-                        }
-
-                        $propertyType = strval($fkKeyPropertyReflected->getType());
-
-                        // If the column name is specified in the Attributes\ForeignKey attribute use it
-                        if (!is_null($field->fkColumnName)) {
-                            $propertyName = $field->fkColumnName;
-                        }
-                    }
-
-                } else {
-                    // If it's not a fk just add the value
-                    $value = $value ?? $field->defaultValue ?? null;
+                    $propertyName = $property->foreignKeyColumnName;
+                    $propertyType = gettype($value);
                 }
 
-                if ($field->isRequired && empty($value)) {
-                    throw new Exceptions\RepositoryException("{$propertyName} is required!");
-                }
-
-                if (empty($value)) {
-                    continue;
-                }
-
-                // Array to store all the information to create the insert
-                $values[] = new ModelField(
-                    fieldName: $propertyName,
-                    fieldType: $propertyType,
-                    fieldValue: $value
-                );
+            } else {
+                // If it's not a fk just add the value
+                $value = $model->$propertyName ?? $property->defaultValue ?? null;
             }
+
+            if ($property->isRequired && empty($value)) {
+                throw new Exceptions\RepositoryException("{$propertyName} is required!");
+            }
+
+            if (empty($value)) {
+                continue;
+            }
+
+            // Array to store all the information to create the insert
+            $values[] = new ModelField(
+                fieldName: $propertyName,
+                fieldType: $propertyType,
+                fieldValue: $value
+            );
+
         }
         return $values;
     }
@@ -442,17 +522,17 @@ abstract class AbstractRepository
         if ($modelClass !== $this->modelClassPathName) {
             $property = ReflectionUtility::getProperty($modelClass, $property);
 
-            $fkAttribute = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+            $foreignKeyAttribute = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
 
-            if ($fkAttribute !== null) {
+            if ($foreignKeyAttribute !== null) {
                 /**
                  * @var Attributes\ForeignKey $fkAttributeInstance
                  */
-                $fkAttributeInstance = $fkAttribute->newInstance();
+                $fkAttributeInstance = $foreignKeyAttribute->newInstance();
 
                 $propertyName = $fkAttributeInstance->columnName;
 
-                $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
+                $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
                 $propertyType = PDOUtil::getPDOType($keyProperty->getType()->getName());
             } else {
                 $propertyName = $property->getName();
@@ -461,21 +541,23 @@ abstract class AbstractRepository
         } else {
             $property = $this->modelHandler->get($property);
 
-            if ($property->isFk) {
-                $propertyName = $property->fkColumnName;
-                $propertyType = PDOUtil::getPDOType($property->fkColumnType);
+            if ($property->isForeignKey) {
+                $propertyName = $property->foreignKeyColumnName;
+                $propertyType = PDOUtil::getPDOType($property->foreignKeyColumnType);
             } else {
-                $propertyName = $property->fieldName;
-                $propertyType = PDOUtil::getPDOType($property->fieldType);
+                $propertyName = $property->propertyName;
+                $propertyType = PDOUtil::getPDOType($property->propertyType);
             }
         }
 
         $queryBuilder->where("{$propertyName} = " . QueryBuilder::BIND_CHAR . "{$propertyName}");
 
-        // Prepares, binds, executes and fetch the query
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
         $stmt->bindParam(QueryBuilder::BIND_CHAR . $propertyName, $value, $propertyType);
+
         $stmt->execute();
+
         $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
 
         $mappedArr = [];
@@ -488,29 +570,33 @@ abstract class AbstractRepository
     }
 
     /**
-     * Returns the instance model from the array gave by the database
-     * It handles the foreign Attributes\Keys with the
-     *
+     * Returns the instance model from the array received by the database.
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param mixed $obj
      * @param string $modelClass
      * @return Interfaces\IModel|null
-     * @throws Exceptions\RepositoryException If the related object is not found or if the orm mapping triggers an exception
+     * @throws Exceptions\RepositoryException
      * @throws ReflectionException
      */
     private function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
     {
-        if (!isset($obj) || !$obj) return null;
+        if (!isset($obj) || !$obj) {
+            return null;
+        }
 
-        $fkProperties = ReflectionUtility::getFkProperties(modelClass: $modelClass);
+        $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
 
-        foreach ($fkProperties as $fkProperty) {
-            $fkField = $this->modelHandler->get(fieldName: $fkProperty->name);
+        foreach ($foreignKeyProperties as $foreignKeyProperty) {
+            /**
+             * TODO: This would not work in the case of a 3rd level nesting. So fix this code and add unit testing to cover it.
+             */
+            $foreignKeyField = $this->modelHandler->get(fieldName: $foreignKeyProperty->name);
 
-            $columnName = $fkField->fkColumnName;
+            $columnName = $foreignKeyField->foreignKeyColumnName;
 
-            $fkReflectedClass = ReflectionUtility::getReflectionClass(class: $fkField->fieldType);
+            $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyField->propertyType);
 
-            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $fkReflectedClass);
+            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
 
             // Removes the id from the object
             $id = $obj[$columnName];
@@ -518,7 +604,7 @@ abstract class AbstractRepository
 
             $fkObj = $this->findById(
                 id: $id,
-                class: $fkField->fieldType,
+                class: $foreignKeyField->propertyType,
                 table: $fkTableName
             );
 
@@ -526,7 +612,7 @@ abstract class AbstractRepository
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
             }
 
-            $obj[$fkField->fieldName] = $fkObj;
+            $obj[$foreignKeyField->propertyName] = $fkObj;
         }
 
         try {
@@ -540,7 +626,7 @@ abstract class AbstractRepository
 
     /**
      * Bind the values in the array passed to the statement received
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param ModelField[] $values
      * @param PDOStatement $stmt
      * @return PDOStatement
@@ -560,7 +646,7 @@ abstract class AbstractRepository
 
     /**
      * Returns the total amount of items of a given query
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param string $subquery
      * @param FetchParams|null $params
      * @return int
@@ -587,6 +673,12 @@ abstract class AbstractRepository
         return $result[0]->itemsCount;
     }
 
+    /**
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * @param PDOStatement $stmt
+     * @param FetchParams|null $params
+     * @return void
+     */
     private function bindParams(PDOStatement $stmt, ?FetchParams $params): void
     {
         foreach ($params?->getBind() ?? [] as $prop => $value) {
@@ -606,7 +698,7 @@ abstract class AbstractRepository
 
     /**
      * Entry function to findAll models
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param FetchParams|null $params
      * @return FetchedData|IModel[]
      * @throws Exceptions\RepositoryException
@@ -662,6 +754,7 @@ abstract class AbstractRepository
     }
 
     /**
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param mixed $query
      * @param int|null $page
      * @param int|null $itemsPerPage
@@ -706,6 +799,7 @@ abstract class AbstractRepository
     }
 
     /**
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param FetchParams|null $params
      * @return IModel|null
      * @throws Exceptions\RepositoryException
@@ -724,6 +818,7 @@ abstract class AbstractRepository
 
     /**
      * Entry function to find by id a Model
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param $id
      * @param string|null $class
      * @param string|null $table
@@ -738,10 +833,10 @@ abstract class AbstractRepository
             $modelClass = $class ?? $this->modelClassPathName;
             $tableName = $table ?? $this->tableName;
 
-            // Get the Attributes\Key property of the model
-            $keyProperty = ReflectionUtility::getKeyProperty($modelClass);
+            // Get the Attributes\PrimaryKey property of the model
+            $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
 
-            // Get the name of the Attributes\Key
+            // Get the name of the Attributes\PrimaryKey
             $propertyName = $keyProperty->getName();
 
             $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
@@ -758,7 +853,7 @@ abstract class AbstractRepository
 
     /**
      * Entry function to save a Model
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param Interfaces\IModel $model
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
@@ -772,11 +867,11 @@ abstract class AbstractRepository
             $stmt->execute();
 
             // Set id to the saved model
-            $key = ReflectionUtility::getKeyProperty($this->modelClassPathName);
+            $key = ReflectionUtility::getPrimaryKeyProperty($this->modelClassPathName);
 
             $keyField = $this->modelHandler->getKey();
 
-            if ($keyField->isIdentity) {
+            if ($keyField->autoIncrement) {
                 $key->setValue($model, $this->pdo->lastInsertId());
             }
         } catch (Exception $ex) {
@@ -786,7 +881,7 @@ abstract class AbstractRepository
 
     /**
      * Entry function to update a Model
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param Interfaces\IModel $model
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
@@ -805,7 +900,7 @@ abstract class AbstractRepository
 
     /**
      * Entry function to delete a Model
-     *
+     * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param $id
      * @return void
      * @throws Exceptions\RepositoryException

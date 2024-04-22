@@ -8,6 +8,7 @@ use Exception;
 
 /**
  * Used in development, identify a function that is not been implemented yet
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class NotImplementedException extends Exception
 {

@@ -6,13 +6,14 @@ namespace AbstractRepo\Interfaces;
 
 /**
  * The interface that must be implemented by every repository that want to use the abstraction
+ * {@internal}
  */
 interface IRepository
 {
     /**
-     * Returns the name
+     *  This method must be implemented by all the child repositories and it must return the class name of the
+     *  handled object.
+     * @return string
      */
-    public const string GET_MODEL_METHOD_NAME = 'getMode';
-
     static function getModel(): string;
 }

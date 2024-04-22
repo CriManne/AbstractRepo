@@ -6,30 +6,35 @@ namespace AbstractRepo\Plugins\Reflection;
 
 use AbstractRepo\Attributes;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Plugins\Utils\ArrayUtils;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
+use ReflectionParameter;
 use ReflectionProperty;
 
 /**
  * Utility class used for reflection operations
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ReflectionUtility
 {
     /**
-     * Returns the reflected property with the attributeAttributes\Key
+     * Returns the reflected property with the attributeAttributes\PrimaryKey
      *
-     * @param string $modelClass
+     * @param string|ReflectionClass $class
      * @return ReflectionProperty
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      */
-    public static function getKeyProperty(string $modelClass): ReflectionProperty
+    public static function getPrimaryKeyProperty(string|ReflectionClass $class): ReflectionProperty
     {
-        $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\Key::class);
+        $properties = ReflectionUtility::getPropertyWithAttribute($class, Attributes\PrimaryKey::class);
 
-        if (count($properties) == 0) throw new Exceptions\ReflectionException("NoAttributes\Key property defined in $modelClass");
+        if (count($properties) == 0) {
+            throw new Exceptions\ReflectionException("No Attributes\Key property defined in $class");
+        }
 
         return $properties[0];
     }
@@ -37,32 +42,33 @@ final class ReflectionUtility
     /**
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
-     * @param string $modelClass
+     * @param string|ReflectionClass $class
      * @return array
      * @throws ReflectionException
      */
-    public static function getFkProperties(string $modelClass): array
+    public static function getForeignKeyProperties(string|ReflectionClass $class): array
     {
-        $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\ForeignKey::class);
-        return $properties;
+        return ReflectionUtility::getPropertyWithAttribute($class, Attributes\ForeignKey::class);
     }
 
     /**
      * Returns the reflected property with the attribute passed
      *
-     * @param string $modelClass
+     * @param string|ReflectionClass $class
      * @param string $attributeClass
      * @return array
      * @throws ReflectionException
      */
-    public static function getPropertyWithAttribute(string $modelClass, string $attributeClass): array
+    public static function getPropertyWithAttribute(string|ReflectionClass $class, string $attributeClass): array
     {
 
         $properties = [];
 
-        $reflectionClass = new ReflectionClass($modelClass);
+        if (is_string($class)) {
+            $class = new ReflectionClass($class);
+        }
 
-        $reflectionProperties = $reflectionClass->getProperties();
+        $reflectionProperties = $class->getProperties();
 
         foreach ($reflectionProperties as $reflectionProperty) {
 
@@ -209,5 +215,24 @@ final class ReflectionUtility
         $entityProperty = $reflectionEntityProperty->newInstance();
 
         return $entityProperty->tableName;
+    }
+
+    /**
+     * Returns the parameter requested from the constructor or null.
+     *
+     * @param ReflectionClass $reflectionClass
+     * @param string $parameterName
+     * @return ReflectionParameter|null
+     */
+    public static function getConstructorParameter(
+        ReflectionClass $reflectionClass,
+        string $parameterName
+    ): ReflectionParameter|null
+    {
+        $constructorParams = $reflectionClass->getConstructor()->getParameters();
+        return ArrayUtils::findFirstOrNull(
+            fn(ReflectionParameter $param) => $param->getName() === $parameterName,
+            $constructorParams
+        );
     }
 }

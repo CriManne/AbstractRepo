@@ -8,6 +8,7 @@ use Exception;
 
 /**
  * Triggered in the enum operations
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class EnumException extends Exception
 {

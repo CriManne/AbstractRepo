@@ -8,6 +8,7 @@ use Exception;
 
 /**
  * Triggered during the mapping of relational objects
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ORMException extends Exception
 {

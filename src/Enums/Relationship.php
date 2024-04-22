@@ -8,6 +8,7 @@ use AbstractRepo\Exceptions\EnumException;
 
 /**
  * Identifies the types of FOREIGN KEY relationships
+ * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 enum Relationship
 {
