@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
-use AbstractRepo\Exceptions;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
+use AbstractRepo\Test\MockData\Repository\T1Repository;
+use AbstractRepo\Test\MockData\Repository\T2Repository;
+use AbstractRepo\Test\MockData\Repository\T3Repository;
+use AbstractRepo\Test\MockData\Repository\T4Repository;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionException;

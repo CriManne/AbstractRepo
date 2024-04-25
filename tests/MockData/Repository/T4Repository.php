@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Repository;
+namespace AbstractRepo\Test\MockData\Repository;
 
 use AbstractRepo\Repository\AbstractRepository;
-use AbstractRepo\Test\Models\T4;
+use AbstractRepo\Test\MockData\Models\T4;
 
 class T4Repository extends AbstractRepository
 {

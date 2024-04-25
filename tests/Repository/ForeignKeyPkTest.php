@@ -6,11 +6,8 @@ namespace AbstractRepo\Test\Repository;
 
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
-use AbstractRepo\Test\Models\T4;
-use ReflectionException;
+use AbstractRepo\Test\MockData\Models\T3;
+use AbstractRepo\Test\MockData\Models\T4;
 
 class ForeignKeyPkTest extends BaseTest
 {

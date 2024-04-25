@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Models;
+namespace AbstractRepo\Test\MockData\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
@@ -11,13 +11,13 @@ use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity('T4')]
-class T4 implements IModel{
+#[Entity('T5')]
+class T5 implements IModel{
     public function __construct(
         #[PrimaryKey(false)]
-        #[ForeignKey(relationship: Relationship::MANY_TO_ONE, columnName: 't3_id')]
+        #[ForeignKey(relationship: Relationship::MANY_TO_ONE, columnName: 't4_id')]
         #[Searchable]
-        public T3 $t3,
+        public T4 $t3,
         #[Searchable]
         public string $v1
     ){}

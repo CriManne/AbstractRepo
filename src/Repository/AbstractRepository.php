@@ -571,7 +571,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
     /**
      * Returns the instance model from the array received by the database.
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     *
      * @param mixed $obj
      * @param string $modelClass
      * @return Interfaces\IModel|null
@@ -763,6 +763,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
+        /**
+         * Reimplement the find method.
+         * Check for each property if it's nullable then LEFT JOIN otherwise INNER JOIN
+         */
         try {
             $conditions = null;
             $bind = null;

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
-use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T3;
-use AbstractRepo\Test\Models\T4;
+use AbstractRepo\Test\MockData\Models\T3;
+use AbstractRepo\Test\MockData\Models\T4;
 
 class ForeignKeySearchTest extends BaseTest
 {

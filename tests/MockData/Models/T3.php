@@ -2,25 +2,20 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Models;
+namespace AbstractRepo\Test\MockData\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
-use JetBrains\PhpStorm\Deprecated;
 
-#[Entity('T1')]
-class T1 implements IModel
-{
+#[Entity('T3')]
+class T3 implements IModel{
     public function __construct(
         #[PrimaryKey(false)]
-        public int     $id,
         #[Searchable]
-        public string  $v1,
+        public string $id,
         #[Searchable]
-        public ?string $v2 = null
-    )
-    {
-    }
+        public string $v1
+    ){}
 }
