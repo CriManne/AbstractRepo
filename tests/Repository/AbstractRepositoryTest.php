@@ -9,6 +9,7 @@ use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\MockData\Models\T1;
 use AbstractRepo\Test\MockData\Models\T2;
 use AbstractRepo\Test\MockData\Models\T3;
+use AbstractRepo\Test\MockData\Repository\TestInvalidModelRepository;
 use ReflectionException;
 
 class AbstractRepositoryTest extends BaseTest

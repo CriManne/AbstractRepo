@@ -43,7 +43,7 @@ final class ReflectionUtility
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
      * @param string|ReflectionClass $class
-     * @return array
+     * @return ReflectionProperty[]
      * @throws ReflectionException
      */
     public static function getForeignKeyProperties(string|ReflectionClass $class): array
@@ -56,7 +56,7 @@ final class ReflectionUtility
      *
      * @param string|ReflectionClass $class
      * @param string $attributeClass
-     * @return array
+     * @return ReflectionProperty[]
      * @throws ReflectionException
      */
     public static function getPropertyWithAttribute(string|ReflectionClass $class, string $attributeClass): array
@@ -74,7 +74,9 @@ final class ReflectionUtility
 
             $attr = ReflectionUtility::getAttribute($reflectionProperty, $attributeClass);
 
-            if ($attr != null) $properties[] = $reflectionProperty;
+            if ($attr != null) {
+                $properties[] = $reflectionProperty;
+            }
         }
 
         return $properties;

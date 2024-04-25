@@ -237,7 +237,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Recursive function to retrieve the primary key value.
+     * Recursive function to retrieve a property value key value.
      *
      * @param IModel $model
      * @param string $fieldName
@@ -246,15 +246,22 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * @throws Exceptions\ReflectionException
      * @throws RepositoryException
      */
-    private function getForeignKeyValue(
+    private function getPropertyValueRecursive(
         IModel $model,
         string $fieldName
     ): mixed
     {
         $value = $model->$fieldName;
 
+        /**
+         * If it's not a nested object then return the value (primitive type)
+         */
         if (!is_object($value)) {
             return $value;
+        }
+
+        if (!($value instanceof IModel)) {
+            throw new Exceptions\RepositoryException(RepositoryException::MODEL_IS_NOT_HANDLED);
         }
 
         /**
@@ -274,15 +281,23 @@ abstract class AbstractRepository implements Interfaces\IRepository
         $tableName = ReflectionUtility::getTableName($reflectionClassObject);
 
         /**
+         * Get primary key value (this can be a nested object as well so we need to call the recursive function)
+         */
+        $value = $this->getPropertyValueRecursive($value, $primaryKeyFieldName);
+
+        /**
          * Find the related object to ensure that there are no orphan data.
          */
-        $object = $this->findById($value->$primaryKeyFieldName, $reflectionClassObject->getName(), $tableName);
+        $object = $this->findById($value, $reflectionClassObject->getName(), $tableName);
 
         if (!$object) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
         }
 
-        return $this->getForeignKeyValue($object, $primaryKeyFieldName);
+        /**
+         * Return the value of the property
+         */
+        return $value;
     }
 
     /**
@@ -467,7 +482,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                      * The primary key of T1 is T2, and the primary key of T2 is T3.
                      * Then to get the value of the foreign key T2 in T1 we need to fetch the value of the primary key of T3.
                      */
-                    $value = $this->getForeignKeyValue($model, $propertyName);
+                    $value = $this->getPropertyValueRecursive($model, $propertyName);
 
                     $propertyName = $property->foreignKeyColumnName;
                     $propertyType = gettype($value);
@@ -588,31 +603,35 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
         foreach ($foreignKeyProperties as $foreignKeyProperty) {
             /**
-             * TODO: This would not work in the case of a 3rd level nesting. So fix this code and add unit testing to cover it.
+             * I need to use reflection to get the column name
              */
-            $foreignKeyField = $this->modelHandler->get(fieldName: $foreignKeyProperty->name);
+            if ($modelClass !== $this->modelClassPathName) {
+                $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, Attributes\ForeignKey::class);
+                $columnName = $foreignKeyAttribute->newInstance()->columnName;
+            } else {
+                $foreignKeyField = $this->modelHandler->get(fieldName: $foreignKeyProperty->name);
+                $columnName = $foreignKeyField->foreignKeyColumnName;
+            }
 
-            $columnName = $foreignKeyField->foreignKeyColumnName;
-
-            $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyField->propertyType);
-
-            $fkTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
+            $foreignKeyClass = $foreignKeyProperty->getType()->getName();
+            $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
+            $foreignKeyTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
 
             // Removes the id from the object
             $id = $obj[$columnName];
             unset($obj[$columnName]);
 
-            $fkObj = $this->findById(
+            $foreignKeyObject = $this->findById(
                 id: $id,
-                class: $foreignKeyField->propertyType,
-                table: $fkTableName
+                class: $foreignKeyClass,
+                table: $foreignKeyTableName
             );
 
-            if (is_null($fkObj)) {
+            if (is_null($foreignKeyObject)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
             }
 
-            $obj[$foreignKeyField->propertyName] = $fkObj;
+            $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
         }
 
         try {

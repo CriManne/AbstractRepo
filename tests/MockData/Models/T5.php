@@ -17,7 +17,7 @@ class T5 implements IModel{
         #[PrimaryKey(false)]
         #[ForeignKey(relationship: Relationship::MANY_TO_ONE, columnName: 't4_id')]
         #[Searchable]
-        public T4 $t3,
+        public T4 $t4,
         #[Searchable]
         public string $v1
     ){}
