@@ -644,8 +644,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Bind the values in the array passed to the statement received
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Bind the given values to the given statement.
+     *
      * @param ModelField[] $values
      * @param PDOStatement $stmt
      * @return PDOStatement
@@ -664,8 +664,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Returns the total amount of items of a given query
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Returns the total amount of items of a given query.
+     *
      * @param string $subquery
      * @param FetchParams|null $params
      * @return int
@@ -693,7 +693,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Bind the given params from the {@see FetchParams} to the given statement.
+     *
      * @param PDOStatement $stmt
      * @param FetchParams|null $params
      * @return void
@@ -716,7 +717,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     #region Public methods
 
     /**
-     * Entry function to findAll models
+     * Public function to find a a subset of objects based on the given params if any.
      * @TODO: Refactor, phpdocs, cleaning and optimize.
      * @param FetchParams|null $params
      * @return FetchedData|IModel[]
