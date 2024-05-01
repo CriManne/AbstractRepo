@@ -6,9 +6,10 @@ namespace AbstractRepo\Test\Repository;
 
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
+use AbstractRepo\Test\MockData\Models\T1;
+use AbstractRepo\Test\MockData\Models\T2;
+use AbstractRepo\Test\MockData\Models\T3;
+use AbstractRepo\Test\MockData\Repository\TestInvalidModelRepository;
 use ReflectionException;
 
 class AbstractRepositoryTest extends BaseTest

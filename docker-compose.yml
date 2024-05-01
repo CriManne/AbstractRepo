@@ -6,12 +6,16 @@ services:
       - "80:80"
     volumes:
       - ./:/var/www/html/
+      - ./vendor:/var/www/html/vendor
+      - ./xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini
     build:
       context: .
       dockerfile: Dockerfile
     command: bash -c "composer install && apache2-foreground"
     env_file:
       - .env
+    expose:
+      - 9000
 
   database:
     image: mariadb

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Attributes;
 
+use AbstractRepo\Repository\AbstractRepository;
 use Attribute;
 
 /**
- * Set a property as searchable
+ * Attribute that identifies a property as searchable by the {@see AbstractRepository::findByQuery()} method.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 final readonly class Searchable

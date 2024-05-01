@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Test\Repository;
 
-use AbstractRepo\Exceptions;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
+use AbstractRepo\Test\MockData\Repository\T1Repository;
+use AbstractRepo\Test\MockData\Repository\T2Repository;
+use AbstractRepo\Test\MockData\Repository\T3Repository;
+use AbstractRepo\Test\MockData\Repository\T4Repository;
+use AbstractRepo\Test\MockData\Repository\T5Repository;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionException;
@@ -54,9 +55,13 @@ class BaseTest extends TestCase
     public static T4Repository $t4Repo;
 
     /**
+     * @var T5Repository
+     */
+    public static T5Repository $t5Repo;
+
+    /**
      * @return void
      * @throws RepositoryException
-     * @throws ReflectionException
      */
     public static function setUpBeforeClass(): void
     {
@@ -71,6 +76,7 @@ class BaseTest extends TestCase
         self::$t2Repo = new T2Repository(self::$pdo);
         self::$t3Repo = new T3Repository(self::$pdo);
         self::$t4Repo = new T4Repository(self::$pdo);
+        self::$t5Repo = new T5Repository(self::$pdo);
     }
 
     /**
@@ -83,6 +89,7 @@ class BaseTest extends TestCase
         self::$pdo->exec("TRUNCATE TABLE T2;");
         self::$pdo->exec("TRUNCATE TABLE T3;");
         self::$pdo->exec("TRUNCATE TABLE T4;");
+        self::$pdo->exec("TRUNCATE TABLE T5;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
     }
 

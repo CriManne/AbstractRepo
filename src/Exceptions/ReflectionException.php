@@ -11,6 +11,5 @@ use Exception;
  */
 final class ReflectionException extends Exception
 {
-    public const PROPERTY_NOT_FOUND = "Property not found";
-    public const MANAGED_MODEL_NOT_FOUND = "Managed model not found";
+    public const string PROPERTY_NOT_FOUND = "Property not found";
 }
