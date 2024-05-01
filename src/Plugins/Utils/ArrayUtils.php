@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace AbstractRepo\Plugins\Utils;
 
+/**
+ * Array utility class
+ */
 class ArrayUtils
 {
     /**

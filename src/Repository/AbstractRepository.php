@@ -74,7 +74,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
              * Throw error if the model doesn't implement {@see Interfaces\IModel}.
              */
             if (!ReflectionUtility::class_implements($this->modelClassPathName, Interfaces\IModel::class)) {
-                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS);
+                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS_INTERFACE);
             }
 
             $this->tableName = ReflectionUtility::getTableName($modelReflectionClass);
@@ -603,7 +603,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
         foreach ($foreignKeyProperties as $foreignKeyProperty) {
             /**
-             * I need to use reflection to get the column name
+             * Need to use reflection to get the column name
              */
             if ($modelClass !== $this->modelClassPathName) {
                 $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, Attributes\ForeignKey::class);
@@ -652,11 +652,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
     {
-        foreach ($values as $val) {
-            $type = PDOUtil::getPDOType($val->fieldType);
+        foreach ($values as $value) {
+            $type = PDOUtil::getPDOType($value->fieldType);
 
-            $placeholder = QueryBuilder::BIND_CHAR . $val->fieldName;
-            $value = $val->fieldValue;
+            $placeholder = QueryBuilder::BIND_CHAR . $value->fieldName;
+            $value = $value->fieldValue;
 
             $stmt->bindValue($placeholder, $value, $type);
         }
@@ -701,13 +701,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     private function bindParams(PDOStatement $stmt, ?FetchParams $params): void
     {
-        foreach ($params?->getBind() ?? [] as $prop => $value) {
+        foreach ($params?->getBind() ?? [] as $key => $value) {
             $type = gettype($value);
             if ($type === 'array') {
                 $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($prop, $stringifiedArray);
+                $stmt->bindParam($key, $stringifiedArray);
             } else {
-                $stmt->bindParam($prop, $value, PDOUtil::getPDOType(gettype($value)));
+                $stmt->bindParam($key, $value, PDOUtil::getPDOType(gettype($value)));
             }
         }
     }
@@ -717,8 +717,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     #region Public methods
 
     /**
-     * Public function to find a a subset of objects based on the given params if any.
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Find all the objects filtered by the given params if any.
+     *
      * @param FetchParams|null $params
      * @return FetchedData|IModel[]
      * @throws Exceptions\RepositoryException
@@ -748,10 +748,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             $stmt->execute();
 
-            $arr = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $result = $stmt->fetchAll(PDO::FETCH_CLASS);
             $mappedArr = [];
 
-            foreach ($arr as $item) {
+            foreach ($result as $item) {
                 $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClassPathName);
             }
 
@@ -774,7 +774,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Find all the records that matches the given query.
+     *
      * @param mixed $query
      * @param int|null $page
      * @param int|null $itemsPerPage
@@ -783,10 +784,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
-        /**
-         * Reimplement the find method.
-         * Check for each property if it's nullable then LEFT JOIN otherwise INNER JOIN
-         */
         try {
             $conditions = null;
             $bind = null;
@@ -823,7 +820,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Returns the first record for the given params
+     *
      * @param FetchParams|null $params
      * @return IModel|null
      * @throws Exceptions\RepositoryException
@@ -832,7 +830,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
     {
         $params->setPage(0);
         $params->setItemsPerPage(1);
+
         $data = $this->find($params)->getData();
+
         if (empty($data)) {
             return null;
         }
@@ -841,8 +841,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Entry function to find by id a Model
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Returns the first record found by id
+     *
      * @param $id
      * @param string|null $class
      * @param string|null $table
@@ -852,15 +852,15 @@ abstract class AbstractRepository implements Interfaces\IRepository
     public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
     {
         try {
-            // Since this function will be called recursively to handle nesting and foreign Attributes\Keys, it could be
-            // called with different modelClasses and tableNames
+            /**
+             * Since this function will be called recursively to handle nesting and foreign Attributes\Keys,
+             * it could be called with different modelClasses and tableNames
+             */
             $modelClass = $class ?? $this->modelClassPathName;
             $tableName = $table ?? $this->tableName;
 
-            // Get the Attributes\PrimaryKey property of the model
             $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
 
-            // Get the name of the Attributes\PrimaryKey
             $propertyName = $keyProperty->getName();
 
             $res = $this->findWhere($tableName, $modelClass, $propertyName, $id);
@@ -876,8 +876,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Entry function to save a Model
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Save the given model
+     *
      * @param Interfaces\IModel $model
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
@@ -904,8 +904,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Entry function to update a Model
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Updates the given model
+     *
      * @param Interfaces\IModel $model
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
@@ -923,8 +923,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Entry function to delete a Model
-     * @TODO: Refactor, phpdocs, cleaning and optimize.
+     * Deletes the model by the given id
+     *
      * @param $id
      * @return void
      * @throws Exceptions\RepositoryException

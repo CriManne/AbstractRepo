@@ -8,10 +8,9 @@ use Exception;
 
 /**
  * Triggered during the mapping of relational objects
- * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ORMException extends Exception
 {
-    public const FAILED_MAPPING_OBJECT = "Failed mapping object";
-    public const GENERIC_EXCEPTION = "Generic exception while mapping: ";
+    public const string FAILED_MAPPING_OBJECT = "Failed mapping object";
+    public const string GENERIC_EXCEPTION = "Generic exception while mapping: ";
 }

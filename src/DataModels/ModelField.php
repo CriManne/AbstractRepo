@@ -6,7 +6,6 @@ namespace AbstractRepo\DataModels;
 
 /**
  * Used to handle model fields
- * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ModelField
 {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AbstractRepo\Plugins\Utils;
 
 /**
- * @TODO: Refactor, phpdocs, cleaning and optimize.
+ * String utility class
  */
 class StringUtil
 {

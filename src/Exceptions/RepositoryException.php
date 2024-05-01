@@ -15,7 +15,7 @@ final class RepositoryException extends Exception
     /**
      * List of const for each custom exception.
      */
-    public const string MODEL_MUST_IMPLEMENTS = 'The model must implement IModel interface';
+    public const string MODEL_MUST_IMPLEMENTS_INTERFACE = 'The model must implement IModel interface';
     public const string MODEL_IS_NOT_ENTITY = 'The model has no entity attribute';
     public const string FETCH_BY_ID_MULTIPLE_RESULTS = 'Retrieved more than one object when fetching by id!';
     public const string RELATED_OBJECT_NOT_FOUND = 'Related object not found';

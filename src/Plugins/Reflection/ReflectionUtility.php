@@ -16,7 +16,6 @@ use ReflectionProperty;
 
 /**
  * Utility class used for reflection operations
- * @TODO: Refactor, phpdocs, cleaning and optimize.
  */
 final class ReflectionUtility
 {
@@ -132,37 +131,6 @@ final class ReflectionUtility
     }
 
     /**
-     * Invoke the method of the class given.
-     *
-     * @param string $class
-     * @param string $methodName
-     * @param object|null $obj
-     * @return mixed
-     * @throws ReflectionException
-     */
-    public static function invokeMethodOfClass(string $class, string $methodName, ?object $obj): mixed
-    {
-        // Get reflection method getModel
-        $method = new ReflectionMethod($class, $methodName);
-
-        return $method->invoke($obj);
-    }
-
-    /**
-     * Returns the short name of a class
-     *
-     * @param string $class
-     * @return string
-     * @throws ReflectionException
-     * @throws ReflectionException
-     */
-    public static function getClassShortName(string $class): string
-    {
-        $reflectedModel = new ReflectionClass($class);
-        return $reflectedModel->getShortName();
-    }
-
-    /**
      * Override of the class_implements method to check if a class implements a specific interface
      *
      * @param string $className
@@ -228,7 +196,7 @@ final class ReflectionUtility
      */
     public static function getConstructorParameter(
         ReflectionClass $reflectionClass,
-        string $parameterName
+        string          $parameterName
     ): ReflectionParameter|null
     {
         $constructorParams = $reflectionClass->getConstructor()->getParameters();

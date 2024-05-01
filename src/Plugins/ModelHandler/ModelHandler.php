@@ -9,7 +9,7 @@ use AbstractRepo\Exceptions;
 use AbstractRepo\Repository\AbstractRepository;
 
 /**
- * @TODO: Refactor, phpdocs, cleaning and optimize.
+ * The class will handle all the fields of the model the repository handles.
  */
 final class ModelHandler
 {
@@ -31,13 +31,19 @@ final class ModelHandler
      */
     private FieldInfo $keyField;
 
-    public function __construct(
-    )
+    public function __construct()
     {
         $this->fields = array();
         $this->searchableFields = array();
     }
 
+    /**
+     * Adds a field to the list
+     *
+     * @param string $fieldName
+     * @param FieldInfo $fieldInfo
+     * @return void
+     */
     public function save(string $fieldName, FieldInfo $fieldInfo): void
     {
         $this->fields[$fieldName] = $fieldInfo;
@@ -48,6 +54,8 @@ final class ModelHandler
     }
 
     /**
+     * Returns the requested field
+     *
      * @param ?string $fieldName
      * @return FieldInfo|FieldInfo[]
      * @throws Exceptions\RepositoryException
@@ -63,6 +71,7 @@ final class ModelHandler
 
     /**
      * Adds a searchable field
+     *
      * @param string $fieldName
      * @return void
      */
@@ -73,6 +82,7 @@ final class ModelHandler
 
     /**
      * Returns the searchable fields
+     *
      * @return array
      */
     public function getSearchableFields(): array
@@ -82,6 +92,7 @@ final class ModelHandler
 
     /**
      * Return the reference to the key value
+     *
      * @return FieldInfo
      */
     public function getKey(): FieldInfo
