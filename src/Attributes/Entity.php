@@ -7,17 +7,21 @@ namespace AbstractRepo\Attributes;
 use Attribute;
 
 /**
- * Attribute that identifies a class as a database entity.
+ * Identifies a class as a relational entity
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final readonly class Entity
 {
+    public const getTableNameMethod = 'getTableName';
+
     public function __construct(
-        /**
-         * @var string $tableName Name of the database table related to the entity.
-         */
-        public string $tableName
+        public ?string $tableName = null
     )
     {
+    }
+
+    public function getTableName(): ?string
+    {
+        return $this->tableName;
     }
 }

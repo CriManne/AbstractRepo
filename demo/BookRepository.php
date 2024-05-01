@@ -8,7 +8,7 @@ use AbstractRepo\Interfaces\IRepository;
 use AbstractRepo\Repository\AbstractRepository;
 use Demo\Book;
 
-class BookRepository extends AbstractRepository
+class BookRepository extends AbstractRepository implements IRepository
 {
     static public function getModel(): string
     {

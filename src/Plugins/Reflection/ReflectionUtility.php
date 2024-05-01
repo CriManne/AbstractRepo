@@ -6,12 +6,10 @@ namespace AbstractRepo\Plugins\Reflection;
 
 use AbstractRepo\Attributes;
 use AbstractRepo\Exceptions;
-use AbstractRepo\Plugins\Utils\ArrayUtils;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
-use ReflectionParameter;
 use ReflectionProperty;
 
 /**
@@ -20,20 +18,18 @@ use ReflectionProperty;
 final class ReflectionUtility
 {
     /**
-     * Returns the reflected property with the attributeAttributes\PrimaryKey
+     * Returns the reflected property with the attributeAttributes\Key
      *
-     * @param string|ReflectionClass $class
+     * @param string $modelClass
      * @return ReflectionProperty
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
      */
-    public static function getPrimaryKeyProperty(string|ReflectionClass $class): ReflectionProperty
+    public static function getKeyProperty(string $modelClass): ReflectionProperty
     {
-        $properties = ReflectionUtility::getPropertyWithAttribute($class, Attributes\PrimaryKey::class);
+        $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\Key::class);
 
-        if (count($properties) == 0) {
-            throw new Exceptions\ReflectionException("No Attributes\Key property defined in $class");
-        }
+        if (count($properties) == 0) throw new Exceptions\ReflectionException("NoAttributes\Key property defined in $modelClass");
 
         return $properties[0];
     }
@@ -41,41 +37,38 @@ final class ReflectionUtility
     /**
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
-     * @param string|ReflectionClass $class
-     * @return ReflectionProperty[]
+     * @param string $modelClass
+     * @return array
      * @throws ReflectionException
      */
-    public static function getForeignKeyProperties(string|ReflectionClass $class): array
+    public static function getFkProperties(string $modelClass): array
     {
-        return ReflectionUtility::getPropertyWithAttribute($class, Attributes\ForeignKey::class);
+        $properties = ReflectionUtility::getPropertyWithAttribute($modelClass, Attributes\ForeignKey::class);
+        return $properties;
     }
 
     /**
      * Returns the reflected property with the attribute passed
      *
-     * @param string|ReflectionClass $class
+     * @param string $modelClass
      * @param string $attributeClass
-     * @return ReflectionProperty[]
+     * @return array
      * @throws ReflectionException
      */
-    public static function getPropertyWithAttribute(string|ReflectionClass $class, string $attributeClass): array
+    public static function getPropertyWithAttribute(string $modelClass, string $attributeClass): array
     {
 
         $properties = [];
 
-        if (is_string($class)) {
-            $class = new ReflectionClass($class);
-        }
+        $reflectionClass = new ReflectionClass($modelClass);
 
-        $reflectionProperties = $class->getProperties();
+        $reflectionProperties = $reflectionClass->getProperties();
 
         foreach ($reflectionProperties as $reflectionProperty) {
 
             $attr = ReflectionUtility::getAttribute($reflectionProperty, $attributeClass);
 
-            if ($attr != null) {
-                $properties[] = $reflectionProperty;
-            }
+            if ($attr != null) $properties[] = $reflectionProperty;
         }
 
         return $properties;
@@ -131,6 +124,37 @@ final class ReflectionUtility
     }
 
     /**
+     * Runs the method of the class passed
+     *
+     * @param string $class
+     * @param string $methodName
+     * @param object|null $obj
+     * @return mixed
+     * @throws ReflectionException
+     */
+    public static function invokeMethodOfClass(string $class, string $methodName, ?object $obj): mixed
+    {
+        // Get reflection method getModel
+        $method = new ReflectionMethod($class, $methodName);
+
+        return $method->invoke($obj);
+    }
+
+    /**
+     * Returns the short name of a class
+     *
+     * @param string $class
+     * @return string
+     * @throws ReflectionException
+     * @throws ReflectionException
+     */
+    public static function getClassShortName(string $class): string
+    {
+        $reflectedModel = new ReflectionClass($class);
+        return $reflectedModel->getShortName();
+    }
+
+    /**
      * Override of the class_implements method to check if a class implements a specific interface
      *
      * @param string $className
@@ -140,9 +164,7 @@ final class ReflectionUtility
     public static function class_implements(string $className, string $interfaceName): bool
     {
         foreach (class_implements($className) as $interface) {
-            if ($interface == $interfaceName) {
-                return true;
-            }
+            if ($interface == $interfaceName) return true;
         }
 
         return false;
@@ -167,42 +189,24 @@ final class ReflectionUtility
      * @param ReflectionClass $reflectionClass
      * @return mixed
      * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
      */
     public static function getTableName(ReflectionClass $reflectionClass): string
     {
-        /**
-         * Check if the model handled has the Attributes\Entity attribute
-         */
-        $reflectionEntityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
+        // Check if the model handled has the Attributes\Entity attribute
+        $entityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
 
         // If there is no Attributes\Entity attribute it will trigger an Exceptions\RepositoryException
-        if (!$reflectionEntityProperty) {
+        if (is_null($entityProperty)) {
             throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_IS_NOT_ENTITY);
         }
-        /**
-         * @var Attributes\Entity $entityProperty
-         */
-        $entityProperty = $reflectionEntityProperty->newInstance();
 
-        return $entityProperty->tableName;
-    }
-
-    /**
-     * Returns the parameter requested from the constructor or null.
-     *
-     * @param ReflectionClass $reflectionClass
-     * @param string $parameterName
-     * @return ReflectionParameter|null
-     */
-    public static function getConstructorParameter(
-        ReflectionClass $reflectionClass,
-        string          $parameterName
-    ): ReflectionParameter|null
-    {
-        $constructorParams = $reflectionClass->getConstructor()->getParameters();
-        return ArrayUtils::findFirstOrNull(
-            fn(ReflectionParameter $param) => $param->getName() === $parameterName,
-            $constructorParams
+        $tableName = ReflectionUtility::invokeMethodOfClass(
+            get_class($entityProperty->newInstance()),
+            Attributes\Entity::getTableNameMethod,
+            $entityProperty->newInstance()
         );
+
+        return $tableName ?? $reflectionClass->getShortName();
     }
 }

@@ -1,7 +1,5 @@
 vendor/*
+TODO.md
 composer.lock
 .idea/
 .env
-.phpunit.result.cache
-.phpunit.cache/*
-coverage/*

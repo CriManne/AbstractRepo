@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace AbstractRepo\DataModels;
 
-/**
- * Data model class to hold fetch parameters.
- */
 final class FetchParams
 {
     /**
@@ -16,10 +13,10 @@ final class FetchParams
      * @param array|null $bind
      */
     public function __construct(
-        private ?int             $page = null,
-        private ?int             $itemsPerPage = null,
-        private readonly ?string $conditions = null,
-        private readonly ?array  $bind = null
+        private ?int    $page = null,
+        private ?int    $itemsPerPage = null,
+        private ?string $conditions = null,
+        private ?array  $bind = null
     )
     {
     }
@@ -56,19 +53,13 @@ final class FetchParams
         return $this->bind;
     }
 
-    /**
-     * @param int $page
-     * @return void
-     */
+
+
     public function setPage(int $page): void
     {
         $this->page = $page;
     }
 
-    /**
-     * @param int $itemsPerPage
-     * @return void
-     */
     public function setItemsPerPage(int $itemsPerPage): void
     {
         $this->itemsPerPage = $itemsPerPage;
