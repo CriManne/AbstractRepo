@@ -10,9 +10,8 @@ RUN apt-get update && \
         unzip \
         default-libmysqlclient-dev
 
-RUN pecl uninstall xdebug && \
-    pecl install xdebug && \
-    docker-php-ext-enable xdebug
+RUN pecl install xdebug \
+    && docker-php-ext-enable xdebug
 
 COPY xdebug.ini /usr/local/etc/php/conf.d/
 

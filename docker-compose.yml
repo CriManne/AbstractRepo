@@ -7,7 +7,6 @@ services:
     volumes:
       - ./:/var/www/html/
       - ./vendor:/var/www/html/vendor
-      - ./xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini
     build:
       context: .
       dockerfile: Dockerfile
