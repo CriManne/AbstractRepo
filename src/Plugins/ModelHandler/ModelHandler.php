@@ -8,6 +8,9 @@ use AbstractRepo\DataModels\FieldInfo;
 use AbstractRepo\Exceptions;
 use AbstractRepo\Repository\AbstractRepository;
 
+/**
+ * The class will handle all the fields of the model the repository handles.
+ */
 final class ModelHandler
 {
     /**
@@ -28,34 +31,47 @@ final class ModelHandler
      */
     private FieldInfo $keyField;
 
-    public function __construct(
-    )
+    public function __construct()
     {
         $this->fields = array();
         $this->searchableFields = array();
     }
 
+    /**
+     * Adds a field to the list
+     *
+     * @param string $fieldName
+     * @param FieldInfo $fieldInfo
+     * @return void
+     */
     public function save(string $fieldName, FieldInfo $fieldInfo): void
     {
         $this->fields[$fieldName] = $fieldInfo;
 
-        if ($fieldInfo->isKey) {
+        if ($fieldInfo->isPrimaryKey) {
             $this->keyField = &$this->fields[$fieldName];
         }
     }
 
     /**
-     * @param string $fieldName
-     * @return FieldInfo
+     * Returns the requested field
+     *
+     * @param ?string $fieldName
+     * @return FieldInfo|FieldInfo[]
      * @throws Exceptions\RepositoryException
      */
-    public function get(string $fieldName): FieldInfo
+    public function get(?string $fieldName = null): FieldInfo|array
     {
+        if (!$fieldName) {
+            return $this->fields;
+        }
+
         return $this->fields[$fieldName] ?? throw new Exceptions\RepositoryException("Field {$fieldName} not found");
     }
 
     /**
      * Adds a searchable field
+     *
      * @param string $fieldName
      * @return void
      */
@@ -66,6 +82,7 @@ final class ModelHandler
 
     /**
      * Returns the searchable fields
+     *
      * @return array
      */
     public function getSearchableFields(): array
@@ -75,6 +92,7 @@ final class ModelHandler
 
     /**
      * Return the reference to the key value
+     *
      * @return FieldInfo
      */
     public function getKey(): FieldInfo

@@ -8,28 +8,22 @@ use AbstractRepo\Enums\Relationship;
 use Attribute;
 
 /**
- * Identifies a foreign key field
+ * Attribute that identifies a property as a foreign key.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 readonly final class ForeignKey
 {
-    public const getRelationshipMethod = 'getRelationship';
-    public const getColumnNameMethod = 'getColumnName';
-
     public function __construct(
+        /**
+         * @var Relationship $relationship The foreign key type, {@see Relationship}.
+         */
         public Relationship $relationship,
+
+        /**
+         * @var string $columnName The column name in the related entity.
+         */
         public string       $columnName
     )
     {
-    }
-
-    public function getRelationship(): Relationship
-    {
-        return $this->relationship;
-    }
-
-    public function getColumnName(): string
-    {
-        return $this->columnName;
     }
 }

@@ -5,14 +5,10 @@ declare(strict_types=1);
 namespace AbstractRepo\Test\Repository;
 
 use AbstractRepo\DataModels\FetchParams;
-use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
-use PDO;
-use PHPUnit\Framework\TestCase;
-use ReflectionException;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Exceptions\RepositoryException;
+use AbstractRepo\Test\MockData\Models\T1;
+use ReflectionException;
 
 class PaginationTest extends BaseTest
 {

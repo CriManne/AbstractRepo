@@ -7,6 +7,9 @@ namespace AbstractRepo\DataModels;
 use AbstractRepo\Interfaces\IModel;
 use JsonSerializable;
 
+/**
+ * Data model to handle the fetched paginated data.
+ */
 final readonly class FetchedData implements JsonSerializable
 {
     /**
@@ -22,7 +25,6 @@ final readonly class FetchedData implements JsonSerializable
         private int   $totalPages
     )
     {
-
     }
 
     /**

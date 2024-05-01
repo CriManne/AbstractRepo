@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Plugins\Types;
+namespace AbstractRepo\Plugins\Utils;
 
+/**
+ * String utility class
+ */
 class StringUtil
 {
     public const EMPTY = "";
