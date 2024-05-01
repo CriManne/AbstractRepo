@@ -7,7 +7,7 @@ namespace Demo;
 use AbstractRepo\Interfaces\IRepository;
 use AbstractRepo\Repository\AbstractRepository;
 
-class AuthorRepository extends AbstractRepository implements IRepository
+class AuthorRepository extends AbstractRepository
 {
     static public function getModel(): string
     {
