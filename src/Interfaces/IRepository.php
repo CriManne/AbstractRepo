@@ -9,10 +9,5 @@ namespace AbstractRepo\Interfaces;
  */
 interface IRepository
 {
-    /**
-     * This method must be implemented by all the child repositories and it must return the class name of the
-     * handled object.
-     * @return string
-     */
     static function getModel(): string;
 }

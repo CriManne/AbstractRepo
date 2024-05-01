@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\MockData\Models;
+namespace AbstractRepo\Test\Models;
 
 class InvalidModel{}
