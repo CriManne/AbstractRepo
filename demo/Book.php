@@ -10,7 +10,7 @@ use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity]
+#[Entity('Book')]
 class Book implements IModel
 {
     function __construct(

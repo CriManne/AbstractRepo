@@ -8,7 +8,7 @@ use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity]
+#[Entity('Author')]
 class Author implements IModel
 {
     function __construct(
