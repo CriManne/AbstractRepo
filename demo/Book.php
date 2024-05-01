@@ -6,11 +6,11 @@ namespace Demo;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
-use AbstractRepo\Attributes\Key;
+use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity]
+#[Entity('Book')]
 class Book implements IModel
 {
     function __construct(
@@ -20,7 +20,7 @@ class Book implements IModel
             columnName: 'author_id'
         )]
         public Author $author,
-        #[Key(true)]
+        #[PrimaryKey(true)]
         public ?int   $id = null
     )
     {

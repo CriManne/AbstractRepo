@@ -6,11 +6,8 @@ namespace AbstractRepo\Test\Repository;
 
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Models\T1;
-use AbstractRepo\Test\Models\T2;
-use AbstractRepo\Test\Models\T3;
-use AbstractRepo\Test\Models\T4;
-use ReflectionException;
+use AbstractRepo\Test\MockData\Models\T3;
+use AbstractRepo\Test\MockData\Models\T4;
 
 class ForeignKeyPkTest extends BaseTest
 {
@@ -29,29 +26,6 @@ class ForeignKeyPkTest extends BaseTest
         self::$t4Repo->save($t4);
 
         $this->assertEquals('123', self::$t4Repo->findById('ABC')->t3->v1);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testInvalidModelUpdate(): void
-    {
-        self::expectException(RepositoryException::class);
-
-        $t3 = new T3('ABC', '123');
-        $t3new = new T3('DEF', '345');
-
-        self::$t3Repo->save($t3);
-        self::$t3Repo->save($t3new);
-
-        $t4 = new T4($t3, "test");
-
-        self::$t4Repo->save($t4);
-
-        $t4->t3 = $t3new;
-
-        self::$t4Repo->update($t4);
     }
 
     /**

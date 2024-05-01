@@ -16,11 +16,11 @@ $password = getenv('DB_PASSWORD');
 $pdo = new PDO($dsn, $username, $password);
 
 $pdo->exec("
-        DROP TABLE IF EXISTS book;
-        DROP TABLE IF EXISTS author;
+        DROP TABLE IF EXISTS Book;
+        DROP TABLE IF EXISTS Author;
 
-        CREATE TABLE author(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL);
-        CREATE TABLE book(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL, author_id INT NOT NULL, FOREIGN KEY (author_id) REFERENCES author (id));"
+        CREATE TABLE Author(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL);
+        CREATE TABLE Book(id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, val VARCHAR(255) NOT NULL, author_id INT NOT NULL, FOREIGN KEY (author_id) REFERENCES Author (id));"
 );
 
 $bookRepo = new BookRepository($pdo);
