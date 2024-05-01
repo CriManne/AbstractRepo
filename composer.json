@@ -24,9 +24,11 @@
         "php": "^8.3"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.2"
+        "phpunit/phpunit": "^10.2",
+        "phpunit/php-code-coverage": "^10.1"
     },
     "scripts": {
-        "test":"./vendor/bin/phpunit tests --color --display-warnings"
+        "test":"./vendor/bin/phpunit tests --color --display-warnings",
+        "coverage": "./vendor/bin/phpunit --coverage-html ./coverage/"
     }
 }
