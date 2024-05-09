@@ -281,7 +281,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
         $tableName = ReflectionUtility::getTableName($reflectionClassObject);
 
         /**
-         * Get primary key value (this can be a nested object as well so we need to call the recursive function)
+         * Get primary key value (this can be a nested object as well, so we need to call the recursive function)
          */
         $value = $this->getPropertyValueRecursive($value, $primaryKeyFieldName);
 
