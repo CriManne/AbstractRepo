@@ -11,3 +11,10 @@ CREATE TABLE T1
     v2 varchar(255) null,
     PRIMARY KEY (id)
 );
+
+CREATE TABLE T2
+(
+    id varchar(255) not null,
+    v1 varchar(255) not null,
+    PRIMARY KEY (id)
+);
