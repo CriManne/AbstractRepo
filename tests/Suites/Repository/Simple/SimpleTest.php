@@ -96,6 +96,15 @@ class SimpleTest extends BaseTestSuite
         self::$t1Repo->save($t1);
     }
 
+    public function testSaveModelWithoutRequiredData(): void
+    {
+        self::expectException(RepositoryException::class);
+
+        $t1 = new T1(null, "A","B");
+
+        self::$t1Repo->save($t1);
+    }
+
     /**
      * @dataProvider providerT1Model
      * @param T1 $t1
@@ -235,6 +244,46 @@ class SimpleTest extends BaseTestSuite
                 )
             )
         );
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testArrayPlaceholderInString(): void
+    {
+        $t1 = new T1(1, ":ids:array");
+        self::$t1Repo->save($t1);
+
+        $this->assertCount(
+            1,
+            self::$t1Repo->find(
+                new FetchParams(
+                    conditions: "v1 = ':ids:array'"
+                )
+            )
+        );
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testFindByQueryNoSearchableFields(): void
+    {
+        $t2 = new T2("A", "B");
+        self::$t2Repo->save($t2);
+
+        $this->assertEmpty(self::$t2Repo->findByQuery("A"));
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testEmptyFindFirst(): void
+    {
+        $this->assertNull(self::$t2Repo->findFirst());
     }
 
     /**

@@ -1,25 +1,20 @@
 <?php
 
-declare(strict_types=1);
-
-namespace AbstractRepo\Test\Suites\Repository\Simple\Models;
+namespace AbstractRepo\Test\Suites\Repository\Generic\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 
-#[Entity('T1')]
-class T1 implements IModel
+#[Entity('Model')]
+class Model implements IModel
 {
     public function __construct(
         #[PrimaryKey(autoIncrement: false)]
-        public ?int     $id,
+        public string $id,
         #[Searchable]
-        public string  $v1,
-        #[Searchable]
-        public ?string $v2 = null
-    )
-    {
-    }
+        public string $val
+    ){}
+
 }

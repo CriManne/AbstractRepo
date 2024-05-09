@@ -13,9 +13,7 @@ use AbstractRepo\Interfaces\IModel;
 class T2 implements IModel{
     public function __construct(
         #[PrimaryKey(false)]
-        #[Searchable]
         public string $id,
-        #[Searchable]
         public string $v1
     ){}
 }

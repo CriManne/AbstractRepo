@@ -19,7 +19,7 @@ use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
-use AbstractRepo\Plugins\Utils\StringUtil;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
 use Exception;
 use PDO;
 use PDOStatement;
@@ -201,9 +201,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     parameterName: $propertyName
                 );
 
+                /**
+                 * This cannot happen since a property if it's promoted must be in the constructor.
+                 */
+                // @codeCoverageIgnoreStart
                 if (!$constructorParameter) {
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::INVALID_PROMOTED_PROPERTY);
                 }
+                // @codeCoverageIgnoreEnd
 
                 /**
                  * If there's no default value in the promoted property, and it's not auto increment then it's required.
@@ -855,6 +860,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     public function findFirst(?FetchParams $params = null): IModel|null
     {
+        if (!$params) {
+            $params = new FetchParams();
+        }
+
         $params->setPage(0);
         $params->setItemsPerPage(1);
 

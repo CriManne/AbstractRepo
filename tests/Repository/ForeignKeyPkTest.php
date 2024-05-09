@@ -32,6 +32,27 @@ class ForeignKeyPkTest extends BaseTest
      * @return void
      * @throws RepositoryException
      */
+    public function testValidModelFkPkUpdate(): void
+    {
+        $t3 = new T3('ABC', '123');
+
+        self::$t3Repo->save($t3);
+
+        $t4 = new T4($t3, "test");
+
+        self::$t4Repo->save($t4);
+
+        $t4->v1 = "test99";
+
+        self::$t4Repo->update($t4);
+
+        $this->assertEquals('123', self::$t4Repo->findByQuery('test99')[0]->t3->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
     public function testValidModelDelete(): void
     {
         $t3 = new T3('ABC', '123');
