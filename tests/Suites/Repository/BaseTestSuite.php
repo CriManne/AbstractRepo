@@ -6,7 +6,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
-abstract class AbstractTestSuite extends TestCase
+abstract class BaseTestSuite extends TestCase
 {
     /**
      * @var string

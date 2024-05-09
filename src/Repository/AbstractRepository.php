@@ -74,7 +74,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             /**
              * Throw error if the model doesn't implement {@see Interfaces\IModel}.
              */
-            if (!ReflectionUtility::class_implements($this->modelClassPathName, Interfaces\IModel::class)) {
+            if (!$modelReflectionClass->implementsInterface( Interfaces\IModel::class)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS_INTERFACE);
             }
 

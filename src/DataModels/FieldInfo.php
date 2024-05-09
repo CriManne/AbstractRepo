@@ -8,8 +8,9 @@ use AbstractRepo\Enums;
 
 /**
  * Stores the information of a model's field.
+ * @codeCoverageIgnore
  */
-final class FieldInfo
+final readonly class FieldInfo
 {
     public function __construct(
         /**

@@ -6,14 +6,14 @@ namespace AbstractRepo\Test\Suites\Repository\Simple;
 
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Suites\Repository\AbstractTestSuite;
+use AbstractRepo\Test\Suites\Repository\BaseTestSuite;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T1;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T1Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T2Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\TestInvalidModelRepository;
 
-class SimpleTest extends AbstractTestSuite
+class SimpleTest extends BaseTestSuite
 {
     /**
      * @var T1Repository
