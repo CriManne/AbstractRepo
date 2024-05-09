@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Suites\Plugins\Reflection;
+namespace AbstractRepo\Test\Suites\Plugins\Reflection\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;

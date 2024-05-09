@@ -4,12 +4,16 @@ namespace AbstractRepo\Test\Suites\Plugins\Reflection;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\Searchable;
+use AbstractRepo\Exceptions\ReflectionException as AbstractReflectionException;
+use AbstractRepo\Exceptions\RepositoryException as AbstractRepositoryException;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
+use AbstractRepo\Test\Suites\Plugins\Reflection\Models\InvalidModelNoAttributes;
+use AbstractRepo\Test\Suites\Plugins\Reflection\Models\InvalidModelNoPk;
+use AbstractRepo\Test\Suites\Plugins\Reflection\Models\Model;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
-use AbstractRepo\Exceptions\ReflectionException AS AbstractReflectionException;
-use AbstractRepo\Exceptions\RepositoryException AS AbstractRepositoryException;
+
 class ReflectionUtilityTest extends TestCase
 {
     /**

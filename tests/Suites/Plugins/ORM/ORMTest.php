@@ -4,6 +4,8 @@ namespace AbstractRepo\Test\Suites\Plugins\ORM;
 
 use AbstractRepo\Exceptions\ORMException;
 use AbstractRepo\Plugins\ORM\ORM;
+use AbstractRepo\Test\Suites\Plugins\ORM\Models\InvalidModel;
+use AbstractRepo\Test\Suites\Plugins\ORM\Models\Model;
 use PHPUnit\Framework\TestCase;
 use ReflectionException;
 

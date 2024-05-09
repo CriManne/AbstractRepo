@@ -1,6 +1,6 @@
 <?php
 
-namespace AbstractRepo\Test\Suites\Plugins\ORM;
+namespace AbstractRepo\Test\Suites\Plugins\ORM\Models;
 
 use AbstractRepo\Interfaces\IModel;
 
