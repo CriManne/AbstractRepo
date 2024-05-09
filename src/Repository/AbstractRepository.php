@@ -790,6 +790,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             $searchableFields = $this->modelHandler->getSearchableFields();
 
+            if (empty($searchableFields)) {
+                return [];
+            }
+
             if (!empty($searchableFields)) {
                 $query = '%' . $query . '%';
 
