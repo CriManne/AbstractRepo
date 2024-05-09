@@ -794,21 +794,19 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 return [];
             }
 
-            if (!empty($searchableFields)) {
-                $query = '%' . $query . '%';
+            $query = '%' . $query . '%';
 
-                $conditionsArray = [];
-                $bind = [];
+            $conditionsArray = [];
+            $bind = [];
 
-                foreach ($searchableFields as $field) {
-                    $bindPlaceholder = "query{$field}";
+            foreach ($searchableFields as $field) {
+                $bindPlaceholder = "query{$field}";
 
-                    $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
-                    $bind[$bindPlaceholder] = $query;
-                }
-
-                $conditions = implode(' OR ', $conditionsArray);
+                $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
+                $bind[$bindPlaceholder] = $query;
             }
+
+            $conditions = implode(' OR ', $conditionsArray);
 
             return $this->find(
                 new FetchParams(
