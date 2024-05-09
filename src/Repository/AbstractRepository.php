@@ -19,6 +19,7 @@ use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
+use AbstractRepo\Plugins\Utils\StringUtil;
 use Exception;
 use PDO;
 use PDOStatement;
@@ -704,10 +705,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
         foreach ($params?->getBind() ?? [] as $key => $value) {
             $type = gettype($value);
             if ($type === 'array') {
-                $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($key, $stringifiedArray);
+                foreach ($value as $index => $val) {
+                    $stmt->bindValue($key . $index, $val);
+                }
             } else {
-                $stmt->bindParam($key, $value, PDOUtil::getPDOType(gettype($value)));
+                $stmt->bindValue($key, $value, PDOUtil::getPDOType(gettype($value)));
             }
         }
     }
@@ -733,7 +735,30 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 ->from($this->tableName);
 
             if ($params?->getConditions()) {
-                $queryBuilder->where($params->getConditions());
+
+                $conditions = $params->getConditions();
+
+                foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
+                    /**
+                     * If this condition is true it means that there are no binds for the
+                     * found array placeholder
+                     */
+                    if (!isset($params->getBind()[$arrayBind[1]])) {
+                        continue;
+                    }
+
+                    $bindValues = $params->getBind()[$arrayBind[1]];
+
+                    $placeholders = [];
+
+                    for ($i = 0; $i < count($bindValues); $i++) {
+                        $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
+                    }
+
+                    $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
+                }
+
+                $queryBuilder->where($conditions);
             }
 
             $queryNonPaginated = $queryBuilder->getQuery();

@@ -16,7 +16,23 @@ class QueryBuilder
      */
     public const string BIND_CHAR = ':';
 
+    /**
+     * Regex used to identify an array bind
+     */
+    private const string ARRAY_BIND_REGEX = '/:([a-zA-Z0-9_-]+):array/';
+
     private string $query = StringUtil::EMPTY;
+
+    /**
+     * @param string|null $conditions
+     * @return string[]
+     */
+    public static function findArrayBinds(?string $conditions): array
+    {
+        preg_match_all(self::ARRAY_BIND_REGEX, $conditions, $matches, PREG_SET_ORDER);
+
+        return $matches;
+    }
 
     /**
      * Appends a select statement to the query

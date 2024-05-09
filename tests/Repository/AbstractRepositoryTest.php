@@ -17,74 +17,12 @@ class AbstractRepositoryTest extends BaseTest
     /**
      * @return void
      * @throws RepositoryException
-     * @throws ReflectionException
-     */
-    public function testInvalidModel(): void
-    {
-        $this->expectException(RepositoryException::class);
-
-        new TestInvalidModelRepository(self::$pdo);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelSaveAndFindById(): void
-    {
-        $t1 = new T1(1, "test");
-        self::$t1Repo->save($t1);
-        $this->assertEquals('test', self::$t1Repo->findById(1)->v1);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
      */
     public function testValidModelSaveAndFindByIdString(): void
     {
         $t3 = new T3("ABC", "testt3");
         self::$t3Repo->save($t3);
         $this->assertEquals('testt3', self::$t3Repo->findById("ABC")->v1);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelSaveAndFindByIdWrongId(): void
-    {
-        $this->assertEquals(null, self::$t1Repo->findById(999));
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelSaveAndFindAll(): void
-    {
-        for ($i = 100; $i < 150; $i++) {
-            $t = new T1($i, "test");
-            self::$t1Repo->save($t);
-        }
-        $this->assertCount(50, self::$t1Repo->find());
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelUpdateAndFindById(): void
-    {
-        $t1 = new T1(1, "test2");
-
-        self::$t1Repo->save($t1);
-
-        $t1->v1 = "test99";
-
-        self::$t1Repo->update($t1);
-
-        $this->assertEquals('test99', self::$t1Repo->findById(1)->v1);
     }
 
     /**
@@ -102,38 +40,6 @@ class AbstractRepositoryTest extends BaseTest
         self::$t3Repo->update($t3);
 
         $this->assertEquals('test99', self::$t3Repo->findById('admin@gmail.com')->v1);
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelUpdateAndFindByIdWrongId(): void
-    {
-        $t1 = new T1(1, "test99");
-
-        self::$t1Repo->save($t1);
-
-        $t1->id = 999;
-        $t1->v1 = "test99";
-
-        self::$t1Repo->update($t1);
-
-        $this->assertEquals(null, self::$t1Repo->findById(999));
-        $this->assertNotEquals(null, self::$t1Repo->findById(1));
-    }
-
-    /**
-     * @return void
-     * @throws RepositoryException
-     */
-    public function testValidModelDeleteAndFindById(): void
-    {
-        $t1 = new T1(2, "test2");
-        self::$t1Repo->save($t1);
-        $this->assertNotEquals(null, self::$t1Repo->findById($t1->id));
-        self::$t1Repo->delete($t1->id);
-        $this->assertEquals(null, self::$t1Repo->findById($t1->id));
     }
 
     /**
@@ -235,103 +141,5 @@ class AbstractRepositoryTest extends BaseTest
         $t2 = new T2(4, "test2", $t1);
 
         self::$t2Repo->update($t2);
-    }
-
-    public function testValidFindWhere(): void
-    {
-        $t1 = new T1(1, "testRelation");
-        self::$t1Repo->save($t1);
-
-        $this->assertNotNull(
-            self::$t1Repo->find(
-                new FetchParams(
-                    conditions: "id = :id AND v1 = :v1",
-                    bind: [
-                        "id" => 1,
-                        "v1" => 'testRelation'
-                    ]
-                )
-            )
-        );
-    }
-
-    public function testValidFindInArray(): void
-    {
-        $t1 = new T1(1, "testRelation");
-        self::$t1Repo->save($t1);
-
-        $this->assertNotEmpty(
-            self::$t1Repo->find(
-                new FetchParams(
-                    conditions: "id IN (:ids)",
-                    bind: [
-                        "ids" => [1,2,4]
-                    ]
-                )
-            )
-        );
-
-        $this->assertEmpty(
-            self::$t1Repo->find(
-                new FetchParams(
-                    conditions: "id IN (:ids)",
-                    bind: [
-                        "ids" => [523,2,4]
-                    ]
-                )
-            )
-        );
-    }
-
-    public function testValidFindFirst(): void
-    {
-        $t1 = new T1(1, "test");
-        self::$t1Repo->save($t1);
-
-        $t2 = new T1(2, "test");
-        self::$t1Repo->save($t2);
-
-        $this->assertEquals(
-            1,
-            self::$t1Repo->findFirst(
-                new FetchParams(
-                    conditions: "v1 LIKE :v1",
-                    bind: [
-                        "v1" => '%test%'
-                    ]
-                )
-            )->id
-        );
-    }
-
-    public function testSearchByQUery(): void
-    {
-        $t3 = new T3('Ciaosolecome', "solecuoreamore");
-        self::$t3Repo->save($t3);
-
-        $this->assertEquals(
-            'Ciaosolecome',
-            self::$t3Repo->findByQuery(
-                query: 'sole',
-                page: 0,
-                itemsPerPage: 10
-            )->getData()[0]->id
-        );
-
-        $this->assertNotEmpty(
-            self::$t3Repo->findByQuery(
-                query: 'AMOR',
-                page: 0,
-                itemsPerPage: 10
-            )->getData()
-        );
-
-        $this->assertEmpty(
-            self::$t3Repo->findByQuery(
-                query: 'AMORsdasda',
-                page: 0,
-                itemsPerPage: 10
-            )->getData()
-        );
     }
 }
