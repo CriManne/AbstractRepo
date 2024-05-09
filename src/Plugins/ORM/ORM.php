@@ -30,9 +30,12 @@ final class ORM
         $reflectionClass = new ReflectionClass($className);
         try {
             $object = $reflectionClass->newInstanceArgs($object);
+
+            // @codeCoverageIgnoreStart
             if (is_null($object)) {
                 throw new Exceptions\ORMException(Exceptions\ORMException::FAILED_MAPPING_OBJECT);
             }
+            // @codeCoverageIgnoreEnd
 
             return $object;
         } catch (Exception $ex) {

@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Suites\Simple;
+namespace AbstractRepo\Test\Suites\Repository\Simple;
 
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
-use AbstractRepo\Test\Suites\AbstractTestSuite;
-use AbstractRepo\Test\Suites\Simple\Models\T1;
-use AbstractRepo\Test\Suites\Simple\Models\T2;
-use AbstractRepo\Test\Suites\Simple\Repository\T1Repository;
-use AbstractRepo\Test\Suites\Simple\Repository\T2Repository;
-use AbstractRepo\Test\Suites\Simple\Repository\TestInvalidModelRepository;
+use AbstractRepo\Test\Suites\Repository\AbstractTestSuite;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T1;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\T1Repository;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\T2Repository;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\TestInvalidModelRepository;
 
 class SimpleTest extends AbstractTestSuite
 {

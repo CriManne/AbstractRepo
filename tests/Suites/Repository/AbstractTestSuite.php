@@ -1,6 +1,6 @@
 <?php
 
-namespace AbstractRepo\Test\Suites;
+namespace AbstractRepo\Test\Suites\Repository;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
