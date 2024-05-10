@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\MockData\Repository;
+namespace AbstractRepo\Test\Suites\Repository\ManyToOne\Repository;
 
 use AbstractRepo\Repository\AbstractRepository;
-use AbstractRepo\Test\MockData\Models\T5;
+use AbstractRepo\Test\Suites\Repository\ManyToOne\Models\T5;
 
 class T5Repository extends AbstractRepository
 {

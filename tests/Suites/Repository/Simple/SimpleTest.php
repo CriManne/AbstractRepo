@@ -15,14 +15,7 @@ use AbstractRepo\Test\Suites\Repository\Simple\Repository\TestInvalidModelReposi
 
 class SimpleTest extends BaseTestSuite
 {
-    /**
-     * @var T1Repository
-     */
     public static T1Repository $t1Repository;
-
-    /**
-     * @var T2Repository
-     */
     public static T2Repository $t2Repository;
 
     public function __construct(string $name)

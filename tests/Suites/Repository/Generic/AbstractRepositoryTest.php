@@ -4,7 +4,6 @@ namespace AbstractRepo\Test\Suites\Repository\Generic;
 
 use AbstractRepo\Test\Suites\Repository\Generic\Models\InvalidModelNoInterface;
 use AbstractRepo\Test\Suites\Repository\Generic\Models\Model;
-use AbstractRepo\Test\Suites\Repository\Generic\Models\ModelForeignKey;
 use AbstractRepo\Test\Suites\Repository\Generic\Models\ModelNullable;
 use AbstractRepo\Test\Suites\Repository\Generic\Models\ModelPrivate;
 use AbstractRepo\Test\Suites\Repository\Generic\Models\ModelRecursiveForeignKey;

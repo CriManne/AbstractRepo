@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\MockData\Models;
+namespace AbstractRepo\Test\Suites\Repository\ManyToOne\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
