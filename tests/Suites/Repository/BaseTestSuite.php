@@ -11,7 +11,7 @@ abstract class BaseTestSuite extends TestCase
     /**
      * @var string
      */
-    public const string ENV_DSN = 'DB_DSN';
+    public const string ENV_DSN_TEST = 'DB_DSN_TEST';
 
     /**
      * @var string
@@ -34,12 +34,6 @@ abstract class BaseTestSuite extends TestCase
     public const string DROP_TEST_SCHEMA_PATH = '/sql/drop_test_schema.sql';
 
     /**
-     * The file path of the child class
-     * @var string
-     */
-    public static string $baseFilePath;
-
-    /**
      * @var PDO
      */
     public static PDO $pdo;
@@ -49,7 +43,7 @@ abstract class BaseTestSuite extends TestCase
         parent::__construct($name);
 
         self::$pdo = new PDO(
-            dsn: getenv(self::ENV_DSN),
+            dsn: getenv(self::ENV_DSN_TEST),
             username: getenv(self::ENV_USERNAME),
             password: getenv(self::ENV_PASSWORD),
             options: [
@@ -57,10 +51,6 @@ abstract class BaseTestSuite extends TestCase
                 PDO::ATTR_EMULATE_PREPARES => FALSE
             ]
         );
-
-        $childReflectionClass = new ReflectionClass(get_class($this));
-
-        self::$baseFilePath = dirname($childReflectionClass->getFileName());
     }
 
     /**
@@ -68,7 +58,10 @@ abstract class BaseTestSuite extends TestCase
      */
     public static function setUpBeforeClass(): void
     {
-        self::$pdo->exec(file_get_contents(self::$baseFilePath . self::CREATE_TEST_SCHEMA_PATH));
+        $childReflectionClass = new ReflectionClass(get_called_class());
+        $baseFilePath = dirname($childReflectionClass->getFileName());
+
+        self::$pdo->exec(file_get_contents($baseFilePath . self::CREATE_TEST_SCHEMA_PATH));
     }
 
     /**
@@ -76,7 +69,10 @@ abstract class BaseTestSuite extends TestCase
      */
     public static function tearDownAfterClass(): void
     {
-        self::$pdo->exec(file_get_contents(self::$baseFilePath . self::DROP_TEST_SCHEMA_PATH));
+        $childReflectionClass = new ReflectionClass(get_called_class());
+        $baseFilePath = dirname($childReflectionClass->getFileName());
+
+        self::$pdo->exec(file_get_contents($baseFilePath . self::DROP_TEST_SCHEMA_PATH));
     }
 
     /**
