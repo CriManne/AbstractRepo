@@ -6,8 +6,9 @@ namespace AbstractRepo\DataModels;
 
 /**
  * Used to handle model fields
+ * @codeCoverageIgnore
  */
-final class ModelField
+final readonly class ModelField
 {
     public function __construct(
         public string              $fieldName,

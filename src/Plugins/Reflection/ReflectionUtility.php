@@ -60,7 +60,6 @@ final class ReflectionUtility
      */
     public static function getPropertyWithAttribute(string|ReflectionClass $class, string $attributeClass): array
     {
-
         $properties = [];
 
         if (is_string($class)) {
@@ -98,15 +97,16 @@ final class ReflectionUtility
 
         foreach ($reflectionProperties as $reflectionProperty) {
 
-            if ($reflectionProperty->name == $propertyName) return $reflectionProperty;
-
+            if ($reflectionProperty->name == $propertyName) {
+                return $reflectionProperty;
+            }
         }
 
         throw new Exceptions\ReflectionException(Exceptions\ReflectionException::PROPERTY_NOT_FOUND);
     }
 
     /**
-     * Returns the reflected property with the attribute passed
+     * Returns the first attribute of the type given on the object passed.
      *
      * @param ReflectionClass|ReflectionMethod|ReflectionProperty $reflectionObj
      * @param string $attributeClass
@@ -117,7 +117,9 @@ final class ReflectionUtility
         // Attributes of the property
         $attributes = $reflectionObj->getAttributes();
 
-        if (count($attributes) == 0) return null;
+        if (count($attributes) == 0) {
+            return null;
+        }
 
         foreach ($attributes as $attribute) {
             $attributeName = $attribute->getName();
@@ -128,24 +130,6 @@ final class ReflectionUtility
         }
 
         return null;
-    }
-
-    /**
-     * Override of the class_implements method to check if a class implements a specific interface
-     *
-     * @param string $className
-     * @param string $interfaceName
-     * @return boolean
-     */
-    public static function class_implements(string $className, string $interfaceName): bool
-    {
-        foreach (class_implements($className) as $interface) {
-            if ($interface == $interfaceName) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

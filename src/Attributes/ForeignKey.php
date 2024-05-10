@@ -9,6 +9,7 @@ use Attribute;
 
 /**
  * Attribute that identifies a property as a foreign key.
+ * @codeCoverageIgnore
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 readonly final class ForeignKey

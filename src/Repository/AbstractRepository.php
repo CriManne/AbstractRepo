@@ -19,6 +19,7 @@ use AbstractRepo\Plugins\ORM\ORM;
 use AbstractRepo\Plugins\PDO\PDOUtil;
 use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Plugins\Reflection\ReflectionUtility;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
 use Exception;
 use PDO;
 use PDOStatement;
@@ -73,7 +74,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             /**
              * Throw error if the model doesn't implement {@see Interfaces\IModel}.
              */
-            if (!ReflectionUtility::class_implements($this->modelClassPathName, Interfaces\IModel::class)) {
+            if (!$modelReflectionClass->implementsInterface( Interfaces\IModel::class)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS_INTERFACE);
             }
 
@@ -200,9 +201,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     parameterName: $propertyName
                 );
 
+                /**
+                 * This cannot happen since a property if it's promoted must be in the constructor.
+                 */
+                // @codeCoverageIgnoreStart
                 if (!$constructorParameter) {
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::INVALID_PROMOTED_PROPERTY);
                 }
+                // @codeCoverageIgnoreEnd
 
                 /**
                  * If there's no default value in the promoted property, and it's not auto increment then it's required.
@@ -473,8 +479,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             if ($property->isForeignKey) {
 
-                if ($property->foreignKeyRelationshipType == Enums\Relationship::MANY_TO_ONE
-                    || $property->foreignKeyRelationshipType == Enums\Relationship::ONE_TO_ONE) {
+                if ($property->foreignKeyRelationshipType === Enums\Relationship::MANY_TO_ONE
+                    || $property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
 
                     /**
                      * Recursively checks in the nested foreign key objects for the value.
@@ -485,6 +491,34 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     $value = $this->getPropertyValueRecursive($model, $propertyName);
 
                     $propertyName = $property->foreignKeyColumnName;
+
+                    /**
+                     * If it's ONE_TO_ONE there shouldn't be other records with the same foreign key
+                     */
+                    if ($property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
+                        $keyProperty = $this->modelHandler->getKey();
+
+                        $keyPropertyFieldName = $keyProperty->isForeignKey ? $keyProperty->foreignKeyColumnName : $keyProperty->propertyName;
+
+                        /**
+                         * If the primary key property is the same as the current foreign key it doesn't make sense to check
+                         * for duplicates since the primary key already acts as an unicity constraint.
+                         */
+                        if ($keyPropertyFieldName !== $propertyName) {
+                            $recordWithSameForeignKey = $this->findFirst(new FetchParams(
+                                conditions: "{$propertyName} = :foreignKeyValue AND {$keyPropertyFieldName} <> :keyProperty",
+                                bind: [
+                                    "foreignKeyValue" => $value,
+                                    "keyProperty" => $model->$keyPropertyFieldName
+                                ]
+                            ));
+
+                            if ($recordWithSameForeignKey) {
+                                throw new RepositoryException(RepositoryException::ONE_TO_ONE_RELATIONSHIP_FAIL);
+                            }
+                        }
+                    }
+
                     $propertyType = gettype($value);
                 }
 
@@ -704,10 +738,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
         foreach ($params?->getBind() ?? [] as $key => $value) {
             $type = gettype($value);
             if ($type === 'array') {
-                $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($key, $stringifiedArray);
+                foreach ($value as $index => $val) {
+                    $stmt->bindValue($key . $index, $val);
+                }
             } else {
-                $stmt->bindParam($key, $value, PDOUtil::getPDOType(gettype($value)));
+                $stmt->bindValue($key, $value, PDOUtil::getPDOType(gettype($value)));
             }
         }
     }
@@ -733,7 +768,30 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 ->from($this->tableName);
 
             if ($params?->getConditions()) {
-                $queryBuilder->where($params->getConditions());
+
+                $conditions = $params->getConditions();
+
+                foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
+                    /**
+                     * If this condition is true it means that there are no binds for the
+                     * found array placeholder
+                     */
+                    if (!isset($params->getBind()[$arrayBind[1]])) {
+                        continue;
+                    }
+
+                    $bindValues = $params->getBind()[$arrayBind[1]];
+
+                    $placeholders = [];
+
+                    for ($i = 0; $i < count($bindValues); $i++) {
+                        $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
+                    }
+
+                    $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
+                }
+
+                $queryBuilder->where($conditions);
             }
 
             $queryNonPaginated = $queryBuilder->getQuery();
@@ -830,6 +888,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     public function findFirst(?FetchParams $params = null): IModel|null
     {
+        if (!$params) {
+            $params = new FetchParams();
+        }
+
         $params->setPage(0);
         $params->setItemsPerPage(1);
 

@@ -8,6 +8,7 @@ use Attribute;
 
 /**
  * Attribute that identifies a property as a primary key.
+ * @codeCoverageIgnore
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 readonly final class PrimaryKey

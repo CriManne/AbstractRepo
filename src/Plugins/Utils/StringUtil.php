@@ -9,5 +9,5 @@ namespace AbstractRepo\Plugins\Utils;
  */
 class StringUtil
 {
-    public const EMPTY = "";
+    public const string EMPTY = "";
 }
