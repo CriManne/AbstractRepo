@@ -479,8 +479,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             if ($property->isForeignKey) {
 
-                if ($property->foreignKeyRelationshipType == Enums\Relationship::MANY_TO_ONE
-                    || $property->foreignKeyRelationshipType == Enums\Relationship::ONE_TO_ONE) {
+                if ($property->foreignKeyRelationshipType === Enums\Relationship::MANY_TO_ONE
+                    || $property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
 
                     /**
                      * Recursively checks in the nested foreign key objects for the value.
@@ -491,6 +491,34 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     $value = $this->getPropertyValueRecursive($model, $propertyName);
 
                     $propertyName = $property->foreignKeyColumnName;
+
+                    /**
+                     * If it's ONE_TO_ONE there shouldn't be other records with the same foreign key
+                     */
+                    if ($property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
+                        $keyProperty = $this->modelHandler->getKey();
+
+                        $keyPropertyFieldName = $keyProperty->isForeignKey ? $keyProperty->foreignKeyColumnName : $keyProperty->propertyName;
+
+                        /**
+                         * If the primary key property is the same as the current foreign key it doesn't make sense to check
+                         * for duplicates since the primary key already acts as an unicity constraint.
+                         */
+                        if ($keyPropertyFieldName !== $propertyName) {
+                            $recordWithSameForeignKey = $this->findFirst(new FetchParams(
+                                conditions: "{$propertyName} = :foreignKeyValue AND {$keyPropertyFieldName} <> :keyProperty",
+                                bind: [
+                                    "foreignKeyValue" => $value,
+                                    "keyProperty" => $model->$keyPropertyFieldName
+                                ]
+                            ));
+
+                            if ($recordWithSameForeignKey) {
+                                throw new RepositoryException(RepositoryException::ONE_TO_ONE_RELATIONSHIP_FAIL);
+                            }
+                        }
+                    }
+
                     $propertyType = gettype($value);
                 }
 
