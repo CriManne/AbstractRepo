@@ -18,8 +18,8 @@ class InvalidModelPrimaryKeyOnOneToMany implements IModel
         public string $v1,
         #[PrimaryKey(autoIncrement: false)]
         #[OneToMany(
-            referencedField: 't0',
-            referencedClass: InvalidModelReferencedClass::class
+            referencedColumn: 't0',
+            referencedClass: T1::class
         )]
         public ?array $manyT2 = null
     )

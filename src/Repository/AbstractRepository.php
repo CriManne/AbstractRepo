@@ -151,7 +151,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $isPrimaryKey = false;
 
             /**
-             * {@see Attributes\OneToMany::$referencedField}
+             * {@see Attributes\OneToMany::$referencedColumn}
              */
             $oneToManyReferencedField = null;
 
@@ -182,16 +182,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 if ($attributeInstance instanceof ForeignKey) {
                     $foreignKeyRelationshipType = Enums\Relationship::fromAttribute($attributeInstance);
 
-                    /**
-                     * @var Attributes\OneToMany $attributeInstance
-                     */
                     if ($foreignKeyRelationshipType === Enums\Relationship::ONE_TO_MANY) {
-                        if ($attributeInstance->referencedClass === null) {
-                            throw new RepositoryException(
-                                RepositoryException::ONE_TO_MANY_FOREIGN_KEY_MISSING_REFERENCED_CLASS
-                            );
-                        }
-
+                        /**
+                         * @var Attributes\OneToMany $attributeInstance
+                         */
                         if ($propertyType !== 'array') {
                             throw new RepositoryException(
                                 RepositoryException::ONE_TO_MANY_FOREIGN_KEY_INVALID_TYPE
@@ -199,8 +193,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
                         }
 
                         $propertyType = $attributeInstance->referencedClass;
-                        $oneToManyReferencedField = $attributeInstance->referencedField;
+                        $oneToManyReferencedField = $attributeInstance->referencedColumn;
                     } else {
+                        /**
+                         * @var Attributes\ManyToOne|Attributes\OneToOne $attributeInstance
+                         */
                         $foreignKeyColumnName = $attributeInstance->columnName;
                     }
 
@@ -625,10 +622,22 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $foreignKeyAttribute = ReflectionUtility::getAttribute($property, ForeignKey::class);
 
             if ($foreignKeyAttribute !== null) {
-                /**
-                 * @var ForeignKey $fkAttributeInstance
-                 */
                 $fkAttributeInstance = $foreignKeyAttribute->newInstance();
+
+                /**
+                 * This can never happen because this method is just called by {@see AbstractRepository::findById()}
+                 * and a class cannot have as primary key a field with a ONE TO MANY relationship
+                 * {@see RepositoryException::ONE_TO_MANY_CANNOT_BE_PRIMARY_KEY}
+                 */
+                // @codeCoverageIgnoreStart
+                if ($fkAttributeInstance instanceof Attributes\OneToMany) {
+                    throw new RepositoryException(RepositoryException::CANNOT_FIND_WHERE_BY_ONE_TO_MANY_FIELD);
+                }
+                // @codeCoverageIgnoreEnd
+
+                /**
+                 * @var Attributes\OneToOne|Attributes\ManyToOne $fkAttributeInstance
+                 */
 
                 $propertyName = $fkAttributeInstance->columnName;
 
@@ -694,10 +703,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
             if($foreignKeyAttribute instanceof Attributes\ManyToOne
               || $foreignKeyAttribute instanceof Attributes\OneToOne
             ) {
-                $columnName = $foreignKeyAttribute->columnName;
                 $foreignKeyClass = $foreignKeyProperty->getType()->getName();
                 $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
-                $foreignKeyTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
+                $foreignKeyTableName = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
+
+                /**
+                 * @var Attributes\ManyToOne|Attributes\OneToOne $foreignKeyAttribute
+                 */
+                $columnName = $foreignKeyAttribute->columnName;
 
                 // Removes the id from the object
                 $id = $obj[$columnName];
@@ -713,17 +726,22 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
                 }
             } else {
+                $foreignKeyTableName = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
+                $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
+                /**
+                 * @var Attributes\OneToMany $foreignKeyAttribute
+                 */
                 $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
 
-                $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyAttribute->referencedClass);
-                $foreignKeyTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
+                $id = $obj[$primaryKeyProperty->name];
 
-                $foreignKeyObject = $this->findWhere(
-                    tableName: $foreignKeyTableName,
-                    modelClass: $foreignKeyAttribute->referencedClass,
-                    property: $foreignKeyAttribute->columnName,
-                    value: $obj[$primaryKeyProperty->name]
+                $foreignKeyObject = $this->select(
+                    columns: [$foreignKeyPrimaryKeyColumn],
+                    table: $foreignKeyTableName,
+                    conditions: "{$foreignKeyAttribute->referencedColumn} = :id",
+                    params: ["id" => $id]
                 );
+
             }
 
             $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
@@ -806,6 +824,41 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $stmt->bindValue($key, $value, PDOUtil::getPDOType(gettype($value)));
             }
         }
+    }
+
+    /**
+     * @param array       $columns
+     * @param string      $table
+     * @param string|null $conditions
+     * @param array|null  $params
+     *
+     * @return array
+     */
+    private function select(
+        array $columns,
+        string $table,
+        ?string $conditions = null,
+        ?array $params = null
+    ): array
+    {
+        $queryBuilder = (new QueryBuilder())
+            ->select($columns)
+            ->from($table);
+
+        if($conditions){
+            $queryBuilder
+                ->where($conditions);
+        }
+
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+        if($params) {
+            $this->bindParams($stmt, new FetchParams(bind: $params));
+        }
+
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     #endregion

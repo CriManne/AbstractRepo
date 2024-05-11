@@ -16,9 +16,9 @@ readonly final class OneToMany extends ForeignKey
 {
     public function __construct(
         /**
-         * @var string $referencedField The field name in the related entity.
+         * @var string $referencedColumn The column in the related entity.
          */
-        public string $referencedField,
+        public string $referencedColumn,
 
         /**
          * @var string $referencedClass The class name of the related entity.

@@ -19,7 +19,7 @@ class T1 implements IModel
         #[Searchable]
         public string $v1,
         #[OneToMany(
-            referencedField: 't1',
+            referencedColumn: 't1_id',
             referencedClass: T2::class
         )]
         public ?array $manyT2 = null

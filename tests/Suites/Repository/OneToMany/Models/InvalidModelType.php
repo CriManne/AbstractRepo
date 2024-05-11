@@ -19,8 +19,8 @@ class InvalidModelType implements IModel
         #[Searchable]
         public string $v1,
         #[OneToMany(
-            referencedField: 't0',
-            referencedClass: InvalidModelReferencedClass::class
+            referencedColumn: 't0',
+            referencedClass: T1::class
         )]
         public ?int   $manyT2 = null
     )

@@ -39,6 +39,30 @@ final class ReflectionUtility
     }
 
     /**
+     * Returns the column name of the primary key
+     *
+     * @param string|ReflectionClass $class
+     * @return string
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    public static function getPrimaryKeyColumnName(string|ReflectionClass $class): string
+    {
+        $primaryKey = self::getPrimaryKeyProperty($class);
+
+        /**
+         * @var Attributes\ManyToOne|Attributes\OneToOne|null $attribute
+         */
+        $attribute = self::getAttribute($primaryKey, Attributes\ForeignKey::class)?->newInstance();
+
+        if (!$attribute) {
+            return $primaryKey->getName();
+        }
+
+        return $attribute->columnName;
+    }
+
+    /**
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
      * @param string|ReflectionClass $class
@@ -150,16 +174,22 @@ final class ReflectionUtility
     /**
      * Returns the table name of a model
      *
-     * @param ReflectionClass $reflectionClass
+     * @param ReflectionClass|string $class
+     *
      * @return mixed
      * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
      */
-    public static function getTableName(ReflectionClass $reflectionClass): string
+    public static function getTableName(ReflectionClass|string $class): string
     {
+        if (is_string($class)) {
+            $class = new ReflectionClass($class);
+        }
+
         /**
          * Check if the model handled has the Attributes\Entity attribute
          */
-        $reflectionEntityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
+        $reflectionEntityProperty = ReflectionUtility::getAttribute($class, Attributes\Entity::class);
 
         // If there is no Attributes\Entity attribute it will trigger an Exceptions\RepositoryException
         if (!$reflectionEntityProperty) {

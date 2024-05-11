@@ -10,6 +10,7 @@ use AbstractRepo\Plugins\Reflection\ReflectionUtility;
 use AbstractRepo\Test\Suites\Plugins\Reflection\Models\InvalidModelNoAttributes;
 use AbstractRepo\Test\Suites\Plugins\Reflection\Models\InvalidModelNoPk;
 use AbstractRepo\Test\Suites\Plugins\Reflection\Models\Model;
+use AbstractRepo\Test\Suites\Plugins\Reflection\Models\ModelPrimaryKeyAndForeignKey;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
@@ -137,5 +138,17 @@ class ReflectionUtilityTest extends TestCase
         $reflectionClass = new ReflectionClass(Model::class);
 
         $this->assertNotNull(ReflectionUtility::getConstructorParameter($reflectionClass, 'v2'));
+    }
+
+    /**
+     * @return void
+     * @throws AbstractReflectionException
+     * @throws ReflectionException
+     */
+    public function testGetPrimaryKeyColumnName(): void
+    {
+        $reflectionClass = new ReflectionClass(ModelPrimaryKeyAndForeignKey::class);
+
+        $this->assertEquals('id_fk', ReflectionUtility::getPrimaryKeyColumnName($reflectionClass));
     }
 }
