@@ -276,6 +276,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
             if ($isSearchable) {
                 if ($foreignKeyRelationshipType !== null) {
                     if($foreignKeyRelationshipType !== Enums\Relationship::ONE_TO_MANY) {
+                        /**
+                         * @var string $foreignKeyColumnName
+                         */
                         $modelHandler->addSearchableField($foreignKeyColumnName);
                     }
                 } else {
@@ -549,7 +552,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
                         /**
                          * If the primary key property is the same as the current foreign key it doesn't make sense to check
-                         * for duplicates since the primary key already acts as an unicity constraint.
+                         * for duplicates since the primary key already acts as a unique constraint.
                          */
                         if ($keyPropertyFieldName !== $propertyName) {
                             $recordWithSameForeignKey = $this->findFirst(new FetchParams(
