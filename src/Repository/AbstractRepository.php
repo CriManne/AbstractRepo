@@ -57,6 +57,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
     /**
      * @param PDO $pdo
+     *
      * @throws Exceptions\RepositoryException
      */
     function __construct(
@@ -74,7 +75,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             /**
              * Throw error if the model doesn't implement {@see Interfaces\IModel}.
              */
-            if (!$modelReflectionClass->implementsInterface( Interfaces\IModel::class)) {
+            if (!$modelReflectionClass->implementsInterface(Interfaces\IModel::class)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS_INTERFACE);
             }
 
@@ -99,7 +100,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Method to analyze the model given and store with the model handler the basic information of it.
      *
      * @param ReflectionClass $reflectionClass
-     * @param ModelHandler $modelHandler
+     * @param ModelHandler    $modelHandler
+     *
      * @return void
      * @throws Exceptions\ReflectionException
      * @throws RepositoryException
@@ -159,7 +161,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             foreach ($propertyAttributes as $attribute) {
                 $attributeInstance = $attribute->newInstance();
-                $attributeName = $attribute->getName();
+                $attributeName     = $attribute->getName();
 
                 /**
                  * @var Attributes\Searchable $attributeInstance
@@ -172,7 +174,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                  * @var Attributes\PrimaryKey $attributeInstance
                  */
                 if ($attributeName === Attributes\PrimaryKey::class) {
-                    $isPrimaryKey = true;
+                    $isPrimaryKey    = true;
                     $isAutoIncrement = $attributeInstance->autoIncrement;
                 }
 
@@ -192,7 +194,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                             );
                         }
 
-                        $propertyType = $attributeInstance->referencedClass;
+                        $propertyType             = $attributeInstance->referencedClass;
                         $oneToManyReferencedField = $attributeInstance->referencedColumn;
                     } else {
                         /**
@@ -201,7 +203,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                         $foreignKeyColumnName = $attributeInstance->columnName;
                     }
 
-                    $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($propertyType);
+                    $primaryKeyProperty   = ReflectionUtility::getPrimaryKeyProperty($propertyType);
                     $foreignKeyColumnType = $primaryKeyProperty->getType()->getName();
                 }
             }
@@ -272,7 +274,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             if ($isSearchable) {
                 if ($foreignKeyRelationshipType !== null) {
-                    if($foreignKeyRelationshipType !== Enums\Relationship::ONE_TO_MANY) {
+                    if ($foreignKeyRelationshipType !== Enums\Relationship::ONE_TO_MANY) {
                         /**
                          * @var string $foreignKeyColumnName
                          */
@@ -290,6 +292,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      *
      * @param IModel $model
      * @param string $fieldName
+     *
      * @return mixed
      * @throws ReflectionException
      * @throws Exceptions\ReflectionException
@@ -321,7 +324,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
         /**
          * Get primary key and primary key field name
          */
-        $primaryKeyField = ReflectionUtility::getPrimaryKeyProperty($reflectionClassObject);
+        $primaryKeyField     = ReflectionUtility::getPrimaryKeyProperty($reflectionClassObject);
         $primaryKeyFieldName = $primaryKeyField->getName();
 
         /**
@@ -353,6 +356,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Validates the model sent in the request.
      *
      * @param IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException
      */
@@ -367,6 +371,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the insert operation.
      *
      * @param IModel $model
+     *
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
@@ -409,6 +414,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the update operation.
      *
      * @param IModel $model
+     *
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
@@ -473,6 +479,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the delete operation.
      *
      * @param $id
+     *
      * @return PDOStatement
      */
     private function getDeleteStatement($id): PDOStatement
@@ -507,6 +514,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns an array used in the insert an update operation to get every value of the object.
      *
      * @param Interfaces\IModel $model
+     *
      * @return ModelField[]
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
@@ -556,7 +564,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                                 conditions: "{$propertyName} = :foreignKeyValue AND {$keyPropertyFieldName} <> :keyProperty",
                                 bind: [
                                     "foreignKeyValue" => $value,
-                                    "keyProperty" => $model->$keyPropertyFieldName
+                                    "keyProperty"     => $model->$keyPropertyFieldName
                                 ]
                             ));
 
@@ -600,7 +608,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * @param string $tableName
      * @param string $modelClass
      * @param string $property
-     * @param mixed $value
+     * @param mixed  $value
+     *
      * @return array|null
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
@@ -641,7 +650,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
                 $propertyName = $fkAttributeInstance->columnName;
 
-                $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
+                $keyProperty  = ReflectionUtility::getPrimaryKeyProperty($modelClass);
                 $propertyType = PDOUtil::getPDOType($keyProperty->getType()->getName());
             } else {
                 $propertyName = $property->getName();
@@ -681,7 +690,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Returns the instance model from the array received by the database.
      *
-     * @param mixed $obj
+     * @param mixed  $obj
      * @param string $modelClass
      *
      * @return Interfaces\IModel|null
@@ -700,12 +709,12 @@ abstract class AbstractRepository implements Interfaces\IRepository
         foreach ($foreignKeyProperties as $foreignKeyProperty) {
             $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, ForeignKey::class)->newInstance();
 
-            if($foreignKeyAttribute instanceof Attributes\ManyToOne
-              || $foreignKeyAttribute instanceof Attributes\OneToOne
+            if ($foreignKeyAttribute instanceof Attributes\ManyToOne
+                || $foreignKeyAttribute instanceof Attributes\OneToOne
             ) {
-                $foreignKeyClass = $foreignKeyProperty->getType()->getName();
+                $foreignKeyClass          = $foreignKeyProperty->getType()->getName();
                 $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
-                $foreignKeyTableName = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
+                $foreignKeyTableName      = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
 
                 /**
                  * @var Attributes\ManyToOne|Attributes\OneToOne $foreignKeyAttribute
@@ -726,7 +735,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
                 }
             } else {
-                $foreignKeyTableName = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
+                $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
                 $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
                 /**
                  * @var Attributes\OneToMany $foreignKeyAttribute
@@ -761,6 +770,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      *
      * @param ModelField[] $values
      * @param PDOStatement $stmt
+     *
      * @return PDOStatement
      */
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
@@ -769,7 +779,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $type = PDOUtil::getPDOType($value->fieldType);
 
             $placeholder = QueryBuilder::BIND_CHAR . $value->fieldName;
-            $value = $value->fieldValue;
+            $value       = $value->fieldValue;
 
             $stmt->bindValue($placeholder, $value, $type);
         }
@@ -779,8 +789,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Returns the total amount of items of a given query.
      *
-     * @param string $subquery
+     * @param string           $subquery
      * @param FetchParams|null $params
+     *
      * @return int
      */
     private function getItemsCount(string $subquery, ?FetchParams $params): int
@@ -808,8 +819,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Bind the given params from the {@see FetchParams} to the given statement.
      *
-     * @param PDOStatement $stmt
+     * @param PDOStatement     $stmt
      * @param FetchParams|null $params
+     *
      * @return void
      */
     private function bindParams(PDOStatement $stmt, ?FetchParams $params): void
@@ -835,24 +847,24 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * @return array
      */
     private function select(
-        array $columns,
-        string $table,
+        array   $columns,
+        string  $table,
         ?string $conditions = null,
-        ?array $params = null
+        ?array  $params = null
     ): array
     {
         $queryBuilder = (new QueryBuilder())
             ->select($columns)
             ->from($table);
 
-        if($conditions){
+        if ($conditions) {
             $queryBuilder
                 ->where($conditions);
         }
 
         $stmt = $this->pdo->prepare($queryBuilder->getQuery());
 
-        if($params) {
+        if ($params) {
             $this->bindParams($stmt, new FetchParams(bind: $params));
         }
 
@@ -869,6 +881,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Find all the objects filtered by the given params if any.
      *
      * @param FetchParams|null $params
+     *
      * @return FetchedData|IModel[]
      * @throws Exceptions\RepositoryException
      */
@@ -920,7 +933,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             $stmt->execute();
 
-            $result = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $result    = $stmt->fetchAll(PDO::FETCH_CLASS);
             $mappedArr = [];
 
             foreach ($result as $item) {
@@ -948,9 +961,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Find all the records that matches the given query.
      *
-     * @param mixed $query
+     * @param mixed    $query
      * @param int|null $page
      * @param int|null $itemsPerPage
+     *
      * @return FetchedData|array
      * @throws Exceptions\RepositoryException
      */
@@ -958,7 +972,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     {
         try {
             $conditions = null;
-            $bind = null;
+            $bind       = null;
 
             $searchableFields = $this->modelHandler->getSearchableFields();
 
@@ -969,12 +983,12 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $query = '%' . $query . '%';
 
             $conditionsArray = [];
-            $bind = [];
+            $bind            = [];
 
             foreach ($searchableFields as $field) {
                 $bindPlaceholder = "query{$field}";
 
-                $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
+                $conditionsArray[]      = "{$field} LIKE :{$bindPlaceholder}";
                 $bind[$bindPlaceholder] = $query;
             }
 
@@ -997,6 +1011,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the first record for the given params
      *
      * @param FetchParams|null $params
+     *
      * @return IModel|null
      * @throws Exceptions\RepositoryException
      */
@@ -1021,11 +1036,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Returns the first record found by id
      *
-     * @param $id
+     * @param             $id
      * @param string|null $class
      * @param string|null $table
+     *
      * @return IModel|null
-     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not configured properly
+     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not
+     *                                        configured properly
      */
     public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
     {
@@ -1035,7 +1052,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
              * it could be called with different modelClasses and tableNames
              */
             $modelClass = $class ?? $this->modelClassPathName;
-            $tableName = $table ?? $this->tableName;
+            $tableName  = $table ?? $this->tableName;
 
             $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
 
@@ -1057,6 +1074,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Save the given model
      *
      * @param Interfaces\IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
      */
@@ -1085,6 +1103,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Updates the given model
      *
      * @param Interfaces\IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
      */
@@ -1104,6 +1123,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Deletes the model by the given id
      *
      * @param $id
+     *
      * @return void
      * @throws Exceptions\RepositoryException
      */
