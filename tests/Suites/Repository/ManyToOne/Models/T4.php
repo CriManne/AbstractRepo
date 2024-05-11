@@ -6,19 +6,23 @@ namespace AbstractRepo\Test\Suites\Repository\ManyToOne\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
+use AbstractRepo\Attributes\ManyToOne;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T4')]
-class T4 implements IModel{
+class T4 implements IModel
+{
     public function __construct(
         #[PrimaryKey(false)]
-        #[ForeignKey(relationship: Relationship::MANY_TO_ONE, columnName: 't3_id')]
+        #[ManyToOne(columnName: 't3_id')]
         #[Searchable]
-        public T3 $t3,
+        public T3     $t3,
         #[Searchable]
         public string $v1
-    ){}
+    )
+    {
+    }
 }

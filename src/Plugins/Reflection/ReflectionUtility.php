@@ -124,7 +124,9 @@ final class ReflectionUtility
         foreach ($attributes as $attribute) {
             $attributeName = $attribute->getName();
 
-            if ($attributeName == $attributeClass) {
+            if ($attributeName === $attributeClass
+               || is_subclass_of($attribute->newInstance(), $attributeClass)
+            ) {
                 return $attribute;
             }
         }

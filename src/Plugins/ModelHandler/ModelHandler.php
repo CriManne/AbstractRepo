@@ -20,7 +20,7 @@ final class ModelHandler
     private array $fields;
 
     /**
-     * All the fields that are searchable, so that can be included in the {@see AbstractRepository::findByQuery()} methood
+     * All the fields that are searchable, so that can be included in the {@see AbstractRepository::findByQuery()} method
      * @var array
      */
     private array $searchableFields;

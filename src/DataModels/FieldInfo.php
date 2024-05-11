@@ -20,7 +20,7 @@ final readonly class FieldInfo
 
         /**
          * @var string|null $propertyType The type of the property.
-         * This can also be a class full path in case of a foreign key.
+         *                                This can also be a class full path in case of a foreign key.
          */
         public ?string             $propertyType,
 
@@ -62,7 +62,12 @@ final readonly class FieldInfo
         /**
          * @var string|null $foreignKeyColumnType Stores the foreign key column type.
          */
-        public ?string             $foreignKeyColumnType = null
+        public ?string             $foreignKeyColumnType = null,
+
+        /**
+         * @var string|null Stores the referenced field of the one to many relationship
+         */
+        public ?string $oneToManyReferencedField = null
     )
     {
     }

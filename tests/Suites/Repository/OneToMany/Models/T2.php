@@ -2,22 +2,25 @@
 
 declare(strict_types=1);
 
-namespace AbstractRepo\Test\Suites\Repository\OneToOne\Models;
+namespace AbstractRepo\Test\Suites\Repository\OneToMany\Models;
 
 use AbstractRepo\Attributes\Entity;
-use AbstractRepo\Attributes\ForeignKey;
 use AbstractRepo\Attributes\ManyToOne;
-use AbstractRepo\Attributes\OneToOne;
 use AbstractRepo\Attributes\PrimaryKey;
-use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T2')]
-class T2 implements IModel{
+class T2 implements IModel
+{
     public function __construct(
         #[PrimaryKey(false)]
         public string $id,
-        #[OneToOne(columnName: 't1_id')]
-        public T1 $t1
-    ){}
+        public string $v1,
+        #[ManyToOne(
+            columnName: 't1_id'
+        )]
+        public T1     $t1
+    )
+    {
+    }
 }
