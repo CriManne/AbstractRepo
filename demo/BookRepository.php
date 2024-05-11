@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Demo;
 
-use AbstractRepo\Interfaces\IRepository;
 use AbstractRepo\Repository\AbstractRepository;
-use Demo\Book;
 
 class BookRepository extends AbstractRepository
 {

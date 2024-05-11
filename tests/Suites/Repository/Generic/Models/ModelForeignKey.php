@@ -3,11 +3,9 @@
 namespace AbstractRepo\Test\Suites\Repository\Generic\Models;
 
 use AbstractRepo\Attributes\Entity;
-use AbstractRepo\Attributes\ForeignKey;
 use AbstractRepo\Attributes\ManyToOne;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Attributes\Searchable;
-use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('ModelForeignKey')]

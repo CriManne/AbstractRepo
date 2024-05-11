@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace AbstractRepo\Test\Suites\Repository\OneToOne\Models;
 
 use AbstractRepo\Attributes\Entity;
-use AbstractRepo\Attributes\ForeignKey;
-use AbstractRepo\Attributes\ManyToOne;
 use AbstractRepo\Attributes\OneToOne;
 use AbstractRepo\Attributes\PrimaryKey;
-use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T2')]
