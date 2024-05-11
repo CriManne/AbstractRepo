@@ -6,7 +6,6 @@ namespace AbstractRepo\Test\Suites\Repository\Simple\Models;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\PrimaryKey;
-use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T2')]

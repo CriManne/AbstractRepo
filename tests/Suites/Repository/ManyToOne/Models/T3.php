@@ -10,12 +10,15 @@ use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('T3')]
-class T3 implements IModel{
+class T3 implements IModel
+{
     public function __construct(
         #[PrimaryKey(false)]
         #[Searchable]
         public string $id,
         #[Searchable]
         public string $v1
-    ){}
+    )
+    {
+    }
 }
