@@ -739,88 +739,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Returns the instance model from the array received by the database.
-     *
-     * @param mixed  $obj
-     * @param string $modelClass
-     *
-     * @return Interfaces\IModel|null
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     * @throws Exceptions\ReflectionException
-     */
-    private function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
-    {
-        if (!isset($obj) || !$obj) {
-            return null;
-        }
-
-        $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
-
-        foreach ($foreignKeyProperties as $foreignKeyProperty) {
-            $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, ForeignKey::class)->newInstance();
-
-            if ($foreignKeyAttribute instanceof Attributes\ManyToOne
-                || $foreignKeyAttribute instanceof Attributes\OneToOne
-            ) {
-                $foreignKeyClass          = $foreignKeyProperty->getType()->getName();
-                $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
-                $foreignKeyTableName      = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
-
-                /**
-                 * @var Attributes\ManyToOne|Attributes\OneToOne $foreignKeyAttribute
-                 */
-                $columnName = $foreignKeyAttribute->columnName;
-
-                // Removes the id from the object
-                $id = $obj[$columnName];
-                unset($obj[$columnName]);
-
-                if ($id === null) {
-                    $foreignKeyObject = null;
-                } else {
-                    $foreignKeyObject = $this->findById(
-                        id: $id,
-                        class: $foreignKeyClass,
-                        table: $foreignKeyTableName
-                    );
-
-                    if (is_null($foreignKeyObject)) {
-                        throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
-                    }
-                }
-            } else {
-                $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
-                $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
-                /**
-                 * @var Attributes\OneToMany $foreignKeyAttribute
-                 */
-                $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
-
-                $id = $obj[$primaryKeyProperty->name];
-
-                $foreignKeyObject = $this->select(
-                    columns: [$foreignKeyPrimaryKeyColumn],
-                    table: $foreignKeyTableName,
-                    conditions: "{$foreignKeyAttribute->referencedColumn} = :id",
-                    params: ["id" => $id]
-                );
-
-            }
-
-            $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
-        }
-
-        try {
-            $mappedObj = ORM::getNewInstance($modelClass, (array)$obj);
-        } catch (Exceptions\ORMException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-
-        return $mappedObj;
-    }
-
-    /**
      * Bind the given values to the given statement.
      *
      * @param ModelField[] $values
@@ -952,6 +870,88 @@ abstract class AbstractRepository implements Interfaces\IRepository
     #endregion
 
     #region Public methods
+
+    /**
+     * Returns the instance model from the array received by the database.
+     *
+     * @param mixed  $obj
+     * @param string $modelClass
+     *
+     * @return Interfaces\IModel|null
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
+     * @throws Exceptions\ReflectionException
+     */
+    public function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
+    {
+        if (!isset($obj) || !$obj) {
+            return null;
+        }
+
+        $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
+
+        foreach ($foreignKeyProperties as $foreignKeyProperty) {
+            $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, ForeignKey::class)->newInstance();
+
+            if ($foreignKeyAttribute instanceof Attributes\ManyToOne
+                || $foreignKeyAttribute instanceof Attributes\OneToOne
+            ) {
+                $foreignKeyClass          = $foreignKeyProperty->getType()->getName();
+                $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
+                $foreignKeyTableName      = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
+
+                /**
+                 * @var Attributes\ManyToOne|Attributes\OneToOne $foreignKeyAttribute
+                 */
+                $columnName = $foreignKeyAttribute->columnName;
+
+                // Removes the id from the object
+                $id = $obj[$columnName];
+                unset($obj[$columnName]);
+
+                if ($id === null) {
+                    $foreignKeyObject = null;
+                } else {
+                    $foreignKeyObject = $this->findById(
+                        id: $id,
+                        class: $foreignKeyClass,
+                        table: $foreignKeyTableName
+                    );
+
+                    if (is_null($foreignKeyObject)) {
+                        throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                    }
+                }
+            } else {
+                $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
+                $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
+                /**
+                 * @var Attributes\OneToMany $foreignKeyAttribute
+                 */
+                $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
+
+                $id = $obj[$primaryKeyProperty->name];
+
+                $foreignKeyObject = $this->select(
+                    columns: [$foreignKeyPrimaryKeyColumn],
+                    table: $foreignKeyTableName,
+                    conditions: "{$foreignKeyAttribute->referencedColumn} = :id",
+                    params: ["id" => $id]
+                );
+
+            }
+
+            $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
+        }
+
+        try {
+            $mappedObj = ORM::getNewInstance($modelClass, (array)$obj);
+        } catch (Exceptions\ORMException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
+
+        return $mappedObj;
+    }
 
     /**
      * Find all the objects filtered by the given params if any.
