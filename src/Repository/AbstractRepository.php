@@ -888,6 +888,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
             return null;
         }
 
+        $primaryKeyValue = $obj[ReflectionUtility::getPrimaryKeyColumnName($modelClass)]
+            ?? throw new RepositoryException(RepositoryException::CANNOT_FIND_PRIMARY_KEY_VALUE);
+
         $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
 
         foreach ($foreignKeyProperties as $foreignKeyProperty) {
@@ -925,18 +928,12 @@ abstract class AbstractRepository implements Interfaces\IRepository
             } else {
                 $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
                 $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
-                /**
-                 * @var Attributes\OneToMany $foreignKeyAttribute
-                 */
-                $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
-
-                $id = $obj[$primaryKeyProperty->name];
 
                 $foreignKeyObject = $this->select(
                     columns: [$foreignKeyPrimaryKeyColumn],
                     table: $foreignKeyTableName,
                     conditions: "{$foreignKeyAttribute->referencedColumn} = :id",
-                    params: ["id" => $id]
+                    params: ["id" => $primaryKeyValue]
                 );
 
             }
