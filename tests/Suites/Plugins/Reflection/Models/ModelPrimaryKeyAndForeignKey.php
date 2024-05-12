@@ -7,7 +7,6 @@ namespace AbstractRepo\Test\Suites\Plugins\Reflection\Models;
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ManyToOne;
 use AbstractRepo\Attributes\PrimaryKey;
-use AbstractRepo\Attributes\Searchable;
 use AbstractRepo\Interfaces\IModel;
 
 #[Entity('Model')]

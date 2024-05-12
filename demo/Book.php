@@ -6,6 +6,7 @@ namespace Demo;
 
 use AbstractRepo\Attributes\Entity;
 use AbstractRepo\Attributes\ForeignKey;
+use AbstractRepo\Attributes\ManyToOne;
 use AbstractRepo\Attributes\PrimaryKey;
 use AbstractRepo\Enums\Relationship;
 use AbstractRepo\Interfaces\IModel;
@@ -15,8 +16,7 @@ class Book implements IModel
 {
     function __construct(
         public string $val,
-        #[ForeignKey(
-            relationship: Relationship::MANY_TO_ONE,
+        #[ManyToOne(
             columnName: 'author_id'
         )]
         public Author $author,
