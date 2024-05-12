@@ -6,18 +6,26 @@ use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Suites\Repository\BaseTestSuite;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T1;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T2;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T3;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T4;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T5;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\InvalidModelPrimaryKeyOnOneToManyRepository;
-use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\InvalidModelReferencedClassRepository;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\InvalidModelTypeRepository;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\InvalidModelTypeRepository2;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\InvalidModelTypeRepository3;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\T1Repository;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\T2Repository;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\T3Repository;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\T4Repository;
+use AbstractRepo\Test\Suites\Repository\OneToMany\Repository\T5Repository;
 
 class OneToManyTest extends BaseTestSuite
 {
     public static T1Repository $t1Repository;
     public static T2Repository $t2Repository;
+    public static T3Repository $t3Repository;
+    public static T4Repository $t4Repository;
+    public static T5Repository $t5Repository;
 
     /**
      * @param string $name
@@ -36,12 +44,17 @@ class OneToManyTest extends BaseTestSuite
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
         self::$pdo->exec("TRUNCATE TABLE T1;");
         self::$pdo->exec("TRUNCATE TABLE T2;");
+        self::$pdo->exec("TRUNCATE TABLE T3;");
+        self::$pdo->exec("TRUNCATE TABLE T4;");
+        self::$pdo->exec("TRUNCATE TABLE T5;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
         self::$t1Repository = new T1Repository(self::$pdo);
         self::$t2Repository = new T2Repository(self::$pdo);
+        self::$t3Repository = new T3Repository(self::$pdo);
+        self::$t4Repository = new T4Repository(self::$pdo);
+        self::$t5Repository = new T5Repository(self::$pdo);
     }
-
 
     /**
      * @return void
@@ -184,5 +197,41 @@ class OneToManyTest extends BaseTestSuite
         }
 
         self::assertCount(100, self::$t1Repository->findById(1)->manyT2);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testModelSavePrimaryKeyAsForeignKey(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $t3 = new T3(1);
+        $t4 = new T4($t3, "test");
+        $t5 = new T5(null, $t4);
+
+        self::$t3Repository->save($t3);
+        self::$t4Repository->save($t4);
+        self::$t5Repository->save($t5);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testModelFindByIdPrimaryKeyAsForeignKey(): void
+    {
+        $t3 = new T3(1);
+        $t4 = new T4($t3, "test");
+        $t50 = new T5(null, $t4);
+        $t51 = new T5(null, $t4);
+
+        self::$t3Repository->save($t3);
+        self::$t4Repository->save($t4);
+        self::$t5Repository->save($t50);
+        self::$t5Repository->save($t51);
+
+        $this->assertCount(2, self::$t4Repository->findById(1)->manyT5);
     }
 }
