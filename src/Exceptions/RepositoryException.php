@@ -26,4 +26,5 @@ final class RepositoryException extends Exception
     public const string ONE_TO_MANY_FOREIGN_KEY_INVALID_TYPE   = 'The one to many foreign key field must be a nullable array initialized to null.';
     public const string ONE_TO_MANY_CANNOT_BE_PRIMARY_KEY      = 'The one to many foreign key cannot be set as primary key.';
     public const string CANNOT_FIND_WHERE_BY_ONE_TO_MANY_FIELD = 'Cannot find where by the one to many field';
+    public const string CANNOT_FIND_PRIMARY_KEY_VALUE          = 'Cannot find primary key value.';
 }
