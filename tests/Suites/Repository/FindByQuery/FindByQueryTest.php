@@ -124,7 +124,7 @@ class FindByQueryTest extends BaseTestSuite
         self::$t2Repository->save($t21);
         self::$t2Repository->save($t22);
 
-        $this->assertCount(0, self::$t2Repository->findByQuery("foobar"));
+        $this->assertCount(0, self::$t2Repository->findByQuery("barfoo"));
     }
 
     /**
@@ -157,6 +157,6 @@ class FindByQueryTest extends BaseTestSuite
         self::$t3Repository->save($t31);
         self::$t3Repository->save($t32);
 
-        $this->assertCount(0, self::$t2Repository->findByQuery("house"));
+        $this->assertCount(0, self::$t3Repository->findByQuery("house"));
     }
 }

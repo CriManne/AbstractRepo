@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace AbstractRepo\Plugins\ModelHandler;
 
 use AbstractRepo\DataModels\FieldInfo;
+use AbstractRepo\DataModels\SearchableField;
 use AbstractRepo\Exceptions;
+use AbstractRepo\Plugins\QueryBuilder\QueryBuilder;
 use AbstractRepo\Repository\AbstractRepository;
 
 /**
@@ -20,10 +22,10 @@ final class ModelHandler
     private array $fields;
 
     /**
-     * All the fields that are searchable, so that can be included in the {@see AbstractRepository::findByQuery()} method
-     * @var array
+     * The query builder to search the table by query {@see AbstractRepository::findByQuery()}
+     * @var QueryBuilder $searchableFieldsQueryBuilder
      */
-    private array $searchableFields;
+    public QueryBuilder $searchableFieldsQueryBuilder;
 
     /**
      * This field will be the reference to the key value of the model
@@ -34,7 +36,7 @@ final class ModelHandler
     public function __construct()
     {
         $this->fields = array();
-        $this->searchableFields = array();
+        $this->searchableFieldsQueryBuilder = new QueryBuilder();
     }
 
     /**
@@ -67,27 +69,6 @@ final class ModelHandler
         }
 
         return $this->fields[$fieldName] ?? throw new Exceptions\RepositoryException("Field {$fieldName} not found");
-    }
-
-    /**
-     * Adds a searchable field
-     *
-     * @param string $fieldName
-     * @return void
-     */
-    public function addSearchableField(string $fieldName): void
-    {
-        $this->searchableFields[] = $fieldName;
-    }
-
-    /**
-     * Returns the searchable fields
-     *
-     * @return array
-     */
-    public function getSearchableFields(): array
-    {
-        return $this->searchableFields;
     }
 
     /**

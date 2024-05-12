@@ -109,6 +109,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     private function processModel(ReflectionClass $reflectionClass, ModelHandler $modelHandler): void
     {
+        $modelHandler->searchableFieldsQueryBuilder
+            ->select(["{$this->tableName}.*"])
+            ->from("{$this->tableName} AS {$this->tableName}");
+
+        $searchablePlaceholders = [];
+        $searchableConditions = [];
+
         $reflectionProperties = $reflectionClass->getProperties();
 
         foreach ($reflectionProperties as $reflectionProperty) {
@@ -275,16 +282,46 @@ abstract class AbstractRepository implements Interfaces\IRepository
             if ($isSearchable) {
                 if ($foreignKeyRelationshipType !== null) {
                     if ($foreignKeyRelationshipType !== Enums\Relationship::ONE_TO_MANY) {
-                        /**
-                         * @var string $foreignKeyColumnName
-                         */
-                        $modelHandler->addSearchableField($foreignKeyColumnName);
+                        $foreignKeyTableName = ReflectionUtility::getTableName($propertyType);
+                        $foreignKeyAlias = $foreignKeyTableName . $propertyName;
+                        $foreignKeyPrimaryKeyColumnName = ReflectionUtility::getPrimaryKeyColumnName($propertyType);
+
+                        $joinCondition = "{$foreignKeyTableName} AS {$foreignKeyAlias} 
+                                               ON {$this->tableName}.{$foreignKeyColumnName} = {$foreignKeyAlias}.{$foreignKeyPrimaryKeyColumnName}";
+
+                        if ($isRequired) {
+                            $modelHandler->searchableFieldsQueryBuilder
+                                ->innerJoin($joinCondition);
+                        } else {
+                            $modelHandler->searchableFieldsQueryBuilder
+                                ->leftJoin($joinCondition);
+                        }
+
+                        $foreignKeySearchableFields = $this->getModelSearchableSimpleFields($propertyType);
+
+                        if (!$foreignKeySearchableFields) {
+                            continue;
+                        }
+
+                        foreach ($foreignKeySearchableFields AS $searchableField) {
+                            $placeHolder = $foreignKeyAlias . $searchableField;
+
+                            $searchableConditions[] = "{$foreignKeyAlias}.{$searchableField} LIKE :{$placeHolder}";
+                            $searchablePlaceholders[] = $placeHolder;
+                        }
                     }
                 } else {
-                    $modelHandler->addSearchableField($propertyName);
+                    $placeHolder = "{$this->tableName}{$propertyName}";
+
+                    $searchableConditions[] = "{$this->tableName}.{$propertyName} LIKE :{$placeHolder}";
+                    $searchablePlaceholders[] = $placeHolder;
                 }
             }
         }
+
+        $modelHandler->searchableFieldsQueryBuilder
+            ->where(implode(" OR ", $searchableConditions))
+            ->addPlaceholders($searchablePlaceholders);
     }
 
     /**
@@ -839,6 +876,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
+     * Simple raw search method.
+     *
      * @param array       $columns
      * @param string      $table
      * @param string|null $conditions
@@ -871,6 +910,25 @@ abstract class AbstractRepository implements Interfaces\IRepository
         $stmt->execute();
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Returns all the simple searchable fields without nested searching.
+     *
+     * @param string $class
+     *
+     * @return array
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    private function getModelSearchableSimpleFields(string $class): array
+    {
+        $searchableProperties = ReflectionUtility::getPropertyWithAttribute($class, Attributes\Searchable::class);
+
+        return array_map(
+            fn(\ReflectionProperty $property) => ReflectionUtility::getColumnName($class, $property->name),
+            $searchableProperties
+        );
     }
 
     #endregion
@@ -971,37 +1029,57 @@ abstract class AbstractRepository implements Interfaces\IRepository
     public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
         try {
-            $conditions = null;
-            $bind       = null;
+            $queryBuilder = clone $this->modelHandler->searchableFieldsQueryBuilder;
+            $placeholders = $this->modelHandler->searchableFieldsQueryBuilder->getPlaceholders();
 
-            $searchableFields = $this->modelHandler->getSearchableFields();
-
-            if (empty($searchableFields)) {
+            if (empty($placeholders)) {
                 return [];
             }
 
             $query = '%' . $query . '%';
 
-            $conditionsArray = [];
-            $bind            = [];
+            $binds = [];
 
-            foreach ($searchableFields as $field) {
-                $bindPlaceholder = "query{$field}";
-
-                $conditionsArray[]      = "{$field} LIKE :{$bindPlaceholder}";
-                $bind[$bindPlaceholder] = $query;
+            foreach ($placeholders AS $placeholder) {
+                $binds[$placeholder] = $query;
             }
 
-            $conditions = implode(' OR ', $conditionsArray);
+            $params = new FetchParams(page: $page, itemsPerPage: $itemsPerPage, bind: $binds);
 
-            return $this->find(
-                new FetchParams(
-                    page: $page,
-                    itemsPerPage: $itemsPerPage,
-                    conditions: $conditions,
-                    bind: $bind
-                )
-            );
+            $isPaginated = $params->getPage() !== null && $params->getItemsPerPage() !== null;
+
+            $queryNonPaginated = $queryBuilder->getQuery();
+
+            if ($isPaginated) {
+                $queryBuilder->paginate($page, $itemsPerPage);
+            }
+
+            $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+            $this->bindParams($stmt, $params);
+
+            $stmt->execute();
+
+            $result    = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $mappedArr = [];
+
+            foreach ($result as $item) {
+                $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClassPathName);
+            }
+
+            if ($isPaginated) {
+                $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
+                $totalPages = (int)ceil($itemsCount / $params->getItemsPerPage());
+
+                return new FetchedData(
+                    data: $mappedArr,
+                    currentPage: $params->getPage(),
+                    itemsPerPage: $params->getItemsPerPage(),
+                    totalPages: $totalPages
+                );
+            }
+
+            return $mappedArr;
         } catch (Exception $e) {
             throw new Exceptions\RepositoryException($e->getMessage());
         }
