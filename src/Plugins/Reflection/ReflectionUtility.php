@@ -39,6 +39,32 @@ final class ReflectionUtility
     }
 
     /**
+     * Returns the column name of a field
+     *
+     * @param string|ReflectionClass $class
+     * @param string                 $propertyName
+     *
+     * @return string
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    public static function getColumnName(string|ReflectionClass $class, string $propertyName): string
+    {
+        $reflectedProperty = self::getProperty($class, $propertyName);
+
+        /**
+         * @var Attributes\ManyToOne|Attributes\OneToOne|null $attribute
+         */
+        $attribute = self::getAttribute($reflectedProperty, Attributes\ForeignKey::class)?->newInstance();
+
+        if (!$attribute) {
+            return $reflectedProperty->getName();
+        }
+
+        return $attribute->columnName;
+    }
+
+    /**
      * Returns the column name of the primary key
      *
      * @param string|ReflectionClass $class

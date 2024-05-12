@@ -19,6 +19,7 @@ class ModelHandlerTest extends TestCase
                     propertyName: "FIELD1",
                     propertyType: "string",
                     isRequired: true,
+                    allowsNull: false,
                     isPrimaryKey: true,
                     autoIncrement: false,
                     isForeignKey: false,
@@ -59,19 +60,5 @@ class ModelHandlerTest extends TestCase
         );
 
         $this->assertEquals("FIELD1", $modelHandler->getKey()->propertyName);
-    }
-
-    /**
-     * @return void
-     */
-    public function testSearchableFields(): void
-    {
-        $modelHandler = new ModelHandler();
-
-        $modelHandler->addSearchableField('FIELD1');
-        $modelHandler->addSearchableField('FIELD2');
-        $modelHandler->addSearchableField('FIELD3');
-
-        $this->assertCount(3, $modelHandler->getSearchableFields());
     }
 }

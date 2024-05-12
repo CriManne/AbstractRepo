@@ -2,7 +2,6 @@
 
 namespace AbstractRepo\Test\Suites\Repository\OneToMany;
 
-use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Suites\Repository\BaseTestSuite;
 use AbstractRepo\Test\Suites\Repository\OneToMany\Models\T1;
