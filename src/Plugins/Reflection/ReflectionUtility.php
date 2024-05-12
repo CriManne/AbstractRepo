@@ -39,6 +39,56 @@ final class ReflectionUtility
     }
 
     /**
+     * Returns the column name of a field
+     *
+     * @param string|ReflectionClass $class
+     * @param string                 $propertyName
+     *
+     * @return string
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    public static function getColumnName(string|ReflectionClass $class, string $propertyName): string
+    {
+        $reflectedProperty = self::getProperty($class, $propertyName);
+
+        /**
+         * @var Attributes\ManyToOne|Attributes\OneToOne|null $attribute
+         */
+        $attribute = self::getAttribute($reflectedProperty, Attributes\ForeignKey::class)?->newInstance();
+
+        if (!$attribute) {
+            return $reflectedProperty->getName();
+        }
+
+        return $attribute->columnName;
+    }
+
+    /**
+     * Returns the column name of the primary key
+     *
+     * @param string|ReflectionClass $class
+     * @return string
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    public static function getPrimaryKeyColumnName(string|ReflectionClass $class): string
+    {
+        $primaryKey = self::getPrimaryKeyProperty($class);
+
+        /**
+         * @var Attributes\ManyToOne|Attributes\OneToOne|null $attribute
+         */
+        $attribute = self::getAttribute($primaryKey, Attributes\ForeignKey::class)?->newInstance();
+
+        if (!$attribute) {
+            return $primaryKey->getName();
+        }
+
+        return $attribute->columnName;
+    }
+
+    /**
      * Returns the reflected properties with the attribute Attributes\ForeignKey
      *
      * @param string|ReflectionClass $class
@@ -60,7 +110,6 @@ final class ReflectionUtility
      */
     public static function getPropertyWithAttribute(string|ReflectionClass $class, string $attributeClass): array
     {
-
         $properties = [];
 
         if (is_string($class)) {
@@ -98,15 +147,16 @@ final class ReflectionUtility
 
         foreach ($reflectionProperties as $reflectionProperty) {
 
-            if ($reflectionProperty->name == $propertyName) return $reflectionProperty;
-
+            if ($reflectionProperty->name == $propertyName) {
+                return $reflectionProperty;
+            }
         }
 
         throw new Exceptions\ReflectionException(Exceptions\ReflectionException::PROPERTY_NOT_FOUND);
     }
 
     /**
-     * Returns the reflected property with the attribute passed
+     * Returns the first attribute of the type given on the object passed.
      *
      * @param ReflectionClass|ReflectionMethod|ReflectionProperty $reflectionObj
      * @param string $attributeClass
@@ -117,35 +167,21 @@ final class ReflectionUtility
         // Attributes of the property
         $attributes = $reflectionObj->getAttributes();
 
-        if (count($attributes) == 0) return null;
+        if (count($attributes) == 0) {
+            return null;
+        }
 
         foreach ($attributes as $attribute) {
             $attributeName = $attribute->getName();
 
-            if ($attributeName == $attributeClass) {
+            if ($attributeName === $attributeClass
+               || is_subclass_of($attribute->newInstance(), $attributeClass)
+            ) {
                 return $attribute;
             }
         }
 
         return null;
-    }
-
-    /**
-     * Override of the class_implements method to check if a class implements a specific interface
-     *
-     * @param string $className
-     * @param string $interfaceName
-     * @return boolean
-     */
-    public static function class_implements(string $className, string $interfaceName): bool
-    {
-        foreach (class_implements($className) as $interface) {
-            if ($interface == $interfaceName) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -164,16 +200,22 @@ final class ReflectionUtility
     /**
      * Returns the table name of a model
      *
-     * @param ReflectionClass $reflectionClass
+     * @param ReflectionClass|string $class
+     *
      * @return mixed
      * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
      */
-    public static function getTableName(ReflectionClass $reflectionClass): string
+    public static function getTableName(ReflectionClass|string $class): string
     {
+        if (is_string($class)) {
+            $class = new ReflectionClass($class);
+        }
+
         /**
          * Check if the model handled has the Attributes\Entity attribute
          */
-        $reflectionEntityProperty = ReflectionUtility::getAttribute($reflectionClass, Attributes\Entity::class);
+        $reflectionEntityProperty = ReflectionUtility::getAttribute($class, Attributes\Entity::class);
 
         // If there is no Attributes\Entity attribute it will trigger an Exceptions\RepositoryException
         if (!$reflectionEntityProperty) {

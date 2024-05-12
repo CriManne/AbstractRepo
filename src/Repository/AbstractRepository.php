@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AbstractRepo\Repository;
 
 use AbstractRepo\Attributes;
+use AbstractRepo\Attributes\ForeignKey;
 use AbstractRepo\DataModels\FetchedData;
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\DataModels\FieldInfo;
@@ -56,6 +57,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
     /**
      * @param PDO $pdo
+     *
      * @throws Exceptions\RepositoryException
      */
     function __construct(
@@ -73,7 +75,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             /**
              * Throw error if the model doesn't implement {@see Interfaces\IModel}.
              */
-            if (!ReflectionUtility::class_implements($this->modelClassPathName, Interfaces\IModel::class)) {
+            if (!$modelReflectionClass->implementsInterface(Interfaces\IModel::class)) {
                 throw new Exceptions\RepositoryException(Exceptions\RepositoryException::MODEL_MUST_IMPLEMENTS_INTERFACE);
             }
 
@@ -98,7 +100,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Method to analyze the model given and store with the model handler the basic information of it.
      *
      * @param ReflectionClass $reflectionClass
-     * @param ModelHandler $modelHandler
+     * @param ModelHandler    $modelHandler
+     *
      * @return void
      * @throws Exceptions\ReflectionException
      * @throws RepositoryException
@@ -106,6 +109,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
      */
     private function processModel(ReflectionClass $reflectionClass, ModelHandler $modelHandler): void
     {
+        $modelHandler->searchableFieldsQueryBuilder
+            ->select(["{$this->tableName}.*"])
+            ->from("{$this->tableName} AS {$this->tableName}");
+
+        $searchablePlaceholders = [];
+        $searchableConditions = [];
+
         $reflectionProperties = $reflectionClass->getProperties();
 
         foreach ($reflectionProperties as $reflectionProperty) {
@@ -149,11 +159,21 @@ abstract class AbstractRepository implements Interfaces\IRepository
              */
             $isPrimaryKey = false;
 
+            /**
+             * {@see FieldInfo::$allowsNull}
+             */
+            $allowsNull = false;
+
+            /**
+             * {@see Attributes\OneToMany::$referencedColumn}
+             */
+            $oneToManyReferencedField = null;
+
             $propertyAttributes = $reflectionProperty->getAttributes();
 
             foreach ($propertyAttributes as $attribute) {
                 $attributeInstance = $attribute->newInstance();
-                $attributeName = $attribute->getName();
+                $attributeName     = $attribute->getName();
 
                 /**
                  * @var Attributes\Searchable $attributeInstance
@@ -166,18 +186,36 @@ abstract class AbstractRepository implements Interfaces\IRepository
                  * @var Attributes\PrimaryKey $attributeInstance
                  */
                 if ($attributeName === Attributes\PrimaryKey::class) {
-                    $isPrimaryKey = true;
+                    $isPrimaryKey    = true;
                     $isAutoIncrement = $attributeInstance->autoIncrement;
                 }
 
                 /**
-                 * @var Attributes\ForeignKey $attributeInstance
+                 * @var ForeignKey $attributeInstance
                  */
-                if ($attributeName === Attributes\ForeignKey::class) {
-                    $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($propertyType);
+                if ($attributeInstance instanceof ForeignKey) {
+                    $foreignKeyRelationshipType = Enums\Relationship::fromAttribute($attributeInstance);
 
-                    $foreignKeyRelationshipType = $attributeInstance->relationship;
-                    $foreignKeyColumnName = $attributeInstance->columnName;
+                    if ($foreignKeyRelationshipType === Enums\Relationship::ONE_TO_MANY) {
+                        /**
+                         * @var Attributes\OneToMany $attributeInstance
+                         */
+                        if ($propertyType !== 'array') {
+                            throw new RepositoryException(
+                                RepositoryException::ONE_TO_MANY_FOREIGN_KEY_INVALID_TYPE
+                            );
+                        }
+
+                        $propertyType             = $attributeInstance->referencedClass;
+                        $oneToManyReferencedField = $attributeInstance->referencedColumn;
+                    } else {
+                        /**
+                         * @var Attributes\ManyToOne|Attributes\OneToOne $attributeInstance
+                         */
+                        $foreignKeyColumnName = $attributeInstance->columnName;
+                    }
+
+                    $primaryKeyProperty   = ReflectionUtility::getPrimaryKeyProperty($propertyType);
                     $foreignKeyColumnType = $primaryKeyProperty->getType()->getName();
                 }
             }
@@ -191,6 +229,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                  * If it doesn't have a default value and is not a key identity then it's required
                  */
                 $isRequired = !$reflectionProperty->hasDefaultValue() && !$isAutoIncrement;
+                $allowsNull = $reflectionProperty->getType()->allowsNull();
             } else {
                 /**
                  * If it's a promoted property check the default value in the constructor by getting the reflection parameter
@@ -200,14 +239,35 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     parameterName: $propertyName
                 );
 
+                /**
+                 * This cannot happen since a property if it's promoted must be in the constructor.
+                 */
+                // @codeCoverageIgnoreStart
                 if (!$constructorParameter) {
                     throw new Exceptions\RepositoryException(Exceptions\RepositoryException::INVALID_PROMOTED_PROPERTY);
                 }
+                // @codeCoverageIgnoreEnd
 
                 /**
                  * If there's no default value in the promoted property, and it's not auto increment then it's required.
                  */
                 $isRequired = !$constructorParameter->isDefaultValueAvailable() && !$isAutoIncrement;
+
+                $allowsNull = $constructorParameter->allowsNull();
+            }
+
+            if ($foreignKeyRelationshipType === Enums\Relationship::ONE_TO_MANY) {
+                if ($isRequired || !$reflectionProperty->getType()->allowsNull()) {
+                    throw new RepositoryException(
+                        RepositoryException::ONE_TO_MANY_FOREIGN_KEY_INVALID_TYPE
+                    );
+                }
+
+                if ($isPrimaryKey) {
+                    throw new RepositoryException(
+                        RepositoryException::ONE_TO_MANY_CANNOT_BE_PRIMARY_KEY
+                    );
+                }
             }
 
             $modelHandler->save(
@@ -216,24 +276,61 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     propertyName: $propertyName,
                     propertyType: $propertyType,
                     isRequired: $isRequired,
+                    allowsNull: $allowsNull,
                     isPrimaryKey: $isPrimaryKey,
                     autoIncrement: $isAutoIncrement,
                     isForeignKey: $foreignKeyRelationshipType !== null,
                     defaultValue: $reflectionProperty->getDefaultValue(),
                     foreignKeyRelationshipType: $foreignKeyRelationshipType,
                     foreignKeyColumnName: $foreignKeyColumnName,
-                    foreignKeyColumnType: $foreignKeyColumnType
+                    foreignKeyColumnType: $foreignKeyColumnType,
+                    oneToManyReferencedField: $oneToManyReferencedField
                 )
             );
 
             if ($isSearchable) {
                 if ($foreignKeyRelationshipType !== null) {
-                    $modelHandler->addSearchableField($foreignKeyColumnName);
+                    if ($foreignKeyRelationshipType !== Enums\Relationship::ONE_TO_MANY) {
+                        $foreignKeyTableName = ReflectionUtility::getTableName($propertyType);
+                        $foreignKeyAlias = $foreignKeyTableName . $propertyName;
+                        $foreignKeyPrimaryKeyColumnName = ReflectionUtility::getPrimaryKeyColumnName($propertyType);
+
+                        $joinCondition = "{$foreignKeyTableName} AS {$foreignKeyAlias} 
+                                               ON {$this->tableName}.{$foreignKeyColumnName} = {$foreignKeyAlias}.{$foreignKeyPrimaryKeyColumnName}";
+
+                        if ($isRequired && !$allowsNull) {
+                            $modelHandler->searchableFieldsQueryBuilder
+                                ->innerJoin($joinCondition);
+                        } else {
+                            $modelHandler->searchableFieldsQueryBuilder
+                                ->leftJoin($joinCondition);
+                        }
+
+                        $foreignKeySearchableFields = $this->getModelSearchableSimpleFields($propertyType);
+
+                        if (!$foreignKeySearchableFields) {
+                            continue;
+                        }
+
+                        foreach ($foreignKeySearchableFields AS $searchableField) {
+                            $placeHolder = $foreignKeyAlias . $searchableField;
+
+                            $searchableConditions[] = "{$foreignKeyAlias}.{$searchableField} LIKE :{$placeHolder}";
+                            $searchablePlaceholders[] = $placeHolder;
+                        }
+                    }
                 } else {
-                    $modelHandler->addSearchableField($propertyName);
+                    $placeHolder = "{$this->tableName}{$propertyName}";
+
+                    $searchableConditions[] = "{$this->tableName}.{$propertyName} LIKE :{$placeHolder}";
+                    $searchablePlaceholders[] = $placeHolder;
                 }
             }
         }
+
+        $modelHandler->searchableFieldsQueryBuilder
+            ->where(implode(" OR ", $searchableConditions))
+            ->addPlaceholders($searchablePlaceholders);
     }
 
     /**
@@ -241,6 +338,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      *
      * @param IModel $model
      * @param string $fieldName
+     *
      * @return mixed
      * @throws ReflectionException
      * @throws Exceptions\ReflectionException
@@ -272,7 +370,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
         /**
          * Get primary key and primary key field name
          */
-        $primaryKeyField = ReflectionUtility::getPrimaryKeyProperty($reflectionClassObject);
+        $primaryKeyField     = ReflectionUtility::getPrimaryKeyProperty($reflectionClassObject);
         $primaryKeyFieldName = $primaryKeyField->getName();
 
         /**
@@ -281,7 +379,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
         $tableName = ReflectionUtility::getTableName($reflectionClassObject);
 
         /**
-         * Get primary key value (this can be a nested object as well so we need to call the recursive function)
+         * Get primary key value (this can be a nested object as well, so we need to call the recursive function)
          */
         $value = $this->getPropertyValueRecursive($value, $primaryKeyFieldName);
 
@@ -304,6 +402,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Validates the model sent in the request.
      *
      * @param IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException
      */
@@ -318,6 +417,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the insert operation.
      *
      * @param IModel $model
+     *
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
@@ -360,6 +460,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the update operation.
      *
      * @param IModel $model
+     *
      * @return PDOStatement
      * @throws Exceptions\ReflectionException
      * @throws ReflectionException
@@ -424,6 +525,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the PDOStatement for the delete operation.
      *
      * @param $id
+     *
      * @return PDOStatement
      */
     private function getDeleteStatement($id): PDOStatement
@@ -458,6 +560,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns an array used in the insert an update operation to get every value of the object.
      *
      * @param Interfaces\IModel $model
+     *
      * @return ModelField[]
      * @throws Exceptions\ReflectionException
      * @throws Exceptions\RepositoryException
@@ -468,13 +571,17 @@ abstract class AbstractRepository implements Interfaces\IRepository
         $values = [];
 
         foreach ($this->modelHandler->get() as $property) {
+            if ($property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_MANY) {
+                continue;
+            }
+
             $propertyName = $property->propertyName;
             $propertyType = $property->propertyType;
 
             if ($property->isForeignKey) {
 
-                if ($property->foreignKeyRelationshipType == Enums\Relationship::MANY_TO_ONE
-                    || $property->foreignKeyRelationshipType == Enums\Relationship::ONE_TO_ONE) {
+                if ($property->foreignKeyRelationshipType === Enums\Relationship::MANY_TO_ONE
+                    || $property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
 
                     /**
                      * Recursively checks in the nested foreign key objects for the value.
@@ -485,6 +592,34 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     $value = $this->getPropertyValueRecursive($model, $propertyName);
 
                     $propertyName = $property->foreignKeyColumnName;
+
+                    /**
+                     * If it's ONE_TO_ONE there shouldn't be other records with the same foreign key
+                     */
+                    if ($property->foreignKeyRelationshipType === Enums\Relationship::ONE_TO_ONE) {
+                        $keyProperty = $this->modelHandler->getKey();
+
+                        $keyPropertyFieldName = $keyProperty->isForeignKey ? $keyProperty->foreignKeyColumnName : $keyProperty->propertyName;
+
+                        /**
+                         * If the primary key property is the same as the current foreign key it doesn't make sense to check
+                         * for duplicates since the primary key already acts as a unique constraint.
+                         */
+                        if ($keyPropertyFieldName !== $propertyName) {
+                            $recordWithSameForeignKey = $this->findFirst(new FetchParams(
+                                conditions: "{$propertyName} = :foreignKeyValue AND {$keyPropertyFieldName} <> :keyProperty",
+                                bind: [
+                                    "foreignKeyValue" => $value,
+                                    "keyProperty"     => $model->$keyPropertyFieldName
+                                ]
+                            ));
+
+                            if ($recordWithSameForeignKey) {
+                                throw new RepositoryException(RepositoryException::ONE_TO_ONE_RELATIONSHIP_FAIL);
+                            }
+                        }
+                    }
+
                     $propertyType = gettype($value);
                 }
 
@@ -493,9 +628,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $value = $model->$propertyName ?? $property->defaultValue ?? null;
             }
 
-            if ($property->isRequired && empty($value)) {
+            /**
+             * This cannot be possible since it would be blocked by the instantiation of the object itself.
+             */
+            // @codeCoverageIgnoreStart
+            if ($property->isRequired && empty($value) && !$property->allowsNull) {
                 throw new Exceptions\RepositoryException("{$propertyName} is required!");
             }
+            // @codeCoverageIgnoreEnd
 
             if (empty($value)) {
                 continue;
@@ -509,6 +649,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             );
 
         }
+
         return $values;
     }
 
@@ -518,7 +659,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * @param string $tableName
      * @param string $modelClass
      * @param string $property
-     * @param mixed $value
+     * @param mixed  $value
+     *
      * @return array|null
      * @throws Exceptions\RepositoryException
      * @throws ReflectionException
@@ -537,17 +679,29 @@ abstract class AbstractRepository implements Interfaces\IRepository
         if ($modelClass !== $this->modelClassPathName) {
             $property = ReflectionUtility::getProperty($modelClass, $property);
 
-            $foreignKeyAttribute = ReflectionUtility::getAttribute($property, Attributes\ForeignKey::class);
+            $foreignKeyAttribute = ReflectionUtility::getAttribute($property, ForeignKey::class);
 
             if ($foreignKeyAttribute !== null) {
-                /**
-                 * @var Attributes\ForeignKey $fkAttributeInstance
-                 */
                 $fkAttributeInstance = $foreignKeyAttribute->newInstance();
+
+                /**
+                 * This can never happen because this method is just called by {@see AbstractRepository::findById()}
+                 * and a class cannot have as primary key a field with a ONE TO MANY relationship
+                 * {@see RepositoryException::ONE_TO_MANY_CANNOT_BE_PRIMARY_KEY}
+                 */
+                // @codeCoverageIgnoreStart
+                if ($fkAttributeInstance instanceof Attributes\OneToMany) {
+                    throw new RepositoryException(RepositoryException::CANNOT_FIND_WHERE_BY_ONE_TO_MANY_FIELD);
+                }
+                // @codeCoverageIgnoreEnd
+
+                /**
+                 * @var Attributes\OneToOne|Attributes\ManyToOne $fkAttributeInstance
+                 */
 
                 $propertyName = $fkAttributeInstance->columnName;
 
-                $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
+                $keyProperty  = ReflectionUtility::getPrimaryKeyProperty($modelClass);
                 $propertyType = PDOUtil::getPDOType($keyProperty->getType()->getName());
             } else {
                 $propertyName = $property->getName();
@@ -585,69 +739,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
     }
 
     /**
-     * Returns the instance model from the array received by the database.
-     *
-     * @param mixed $obj
-     * @param string $modelClass
-     * @return Interfaces\IModel|null
-     * @throws Exceptions\RepositoryException
-     * @throws ReflectionException
-     */
-    private function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
-    {
-        if (!isset($obj) || !$obj) {
-            return null;
-        }
-
-        $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
-
-        foreach ($foreignKeyProperties as $foreignKeyProperty) {
-            /**
-             * Need to use reflection to get the column name
-             */
-            if ($modelClass !== $this->modelClassPathName) {
-                $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, Attributes\ForeignKey::class);
-                $columnName = $foreignKeyAttribute->newInstance()->columnName;
-            } else {
-                $foreignKeyField = $this->modelHandler->get(fieldName: $foreignKeyProperty->name);
-                $columnName = $foreignKeyField->foreignKeyColumnName;
-            }
-
-            $foreignKeyClass = $foreignKeyProperty->getType()->getName();
-            $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
-            $foreignKeyTableName = ReflectionUtility::getTableName(reflectionClass: $foreignKeyReflectedClass);
-
-            // Removes the id from the object
-            $id = $obj[$columnName];
-            unset($obj[$columnName]);
-
-            $foreignKeyObject = $this->findById(
-                id: $id,
-                class: $foreignKeyClass,
-                table: $foreignKeyTableName
-            );
-
-            if (is_null($foreignKeyObject)) {
-                throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
-            }
-
-            $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
-        }
-
-        try {
-            $mappedObj = ORM::getNewInstance($modelClass, (array)$obj);
-        } catch (Exceptions\ORMException $ex) {
-            throw new Exceptions\RepositoryException($ex->getMessage());
-        }
-
-        return $mappedObj;
-    }
-
-    /**
      * Bind the given values to the given statement.
      *
      * @param ModelField[] $values
      * @param PDOStatement $stmt
+     *
      * @return PDOStatement
      */
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
@@ -656,7 +752,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $type = PDOUtil::getPDOType($value->fieldType);
 
             $placeholder = QueryBuilder::BIND_CHAR . $value->fieldName;
-            $value = $value->fieldValue;
+            $value       = $value->fieldValue;
 
             $stmt->bindValue($placeholder, $value, $type);
         }
@@ -666,8 +762,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Returns the total amount of items of a given query.
      *
-     * @param string $subquery
+     * @param string           $subquery
      * @param FetchParams|null $params
+     *
      * @return int
      */
     private function getItemsCount(string $subquery, ?FetchParams $params): int
@@ -695,8 +792,9 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Bind the given params from the {@see FetchParams} to the given statement.
      *
-     * @param PDOStatement $stmt
+     * @param PDOStatement     $stmt
      * @param FetchParams|null $params
+     *
      * @return void
      */
     private function bindParams(PDOStatement $stmt, ?FetchParams $params): void
@@ -704,12 +802,69 @@ abstract class AbstractRepository implements Interfaces\IRepository
         foreach ($params?->getBind() ?? [] as $key => $value) {
             $type = gettype($value);
             if ($type === 'array') {
-                $stringifiedArray = implode(',', $value);
-                $stmt->bindParam($key, $stringifiedArray);
+                foreach ($value as $index => $val) {
+                    $stmt->bindValue($key . $index, $val);
+                }
             } else {
-                $stmt->bindParam($key, $value, PDOUtil::getPDOType(gettype($value)));
+                $stmt->bindValue($key, $value, PDOUtil::getPDOType(gettype($value)));
             }
         }
+    }
+
+    /**
+     * Simple raw search method.
+     *
+     * @param array       $columns
+     * @param string      $table
+     * @param string|null $conditions
+     * @param array|null  $params
+     *
+     * @return array
+     */
+    private function select(
+        array   $columns,
+        string  $table,
+        ?string $conditions = null,
+        ?array  $params = null
+    ): array
+    {
+        $queryBuilder = (new QueryBuilder())
+            ->select($columns)
+            ->from($table);
+
+        if ($conditions) {
+            $queryBuilder
+                ->where($conditions);
+        }
+
+        $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+        if ($params) {
+            $this->bindParams($stmt, new FetchParams(bind: $params));
+        }
+
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Returns all the simple searchable fields without nested searching.
+     *
+     * @param string $class
+     *
+     * @return array
+     * @throws Exceptions\ReflectionException
+     * @throws ReflectionException
+     */
+    private function getModelSearchableSimpleFields(string $class): array
+    {
+        $searchableProperties = ReflectionUtility::getPropertyWithAttribute($class, Attributes\Searchable::class);
+
+        return array_map(
+            fn(\ReflectionProperty $property) => ReflectionUtility::getColumnName($class, $property->name),
+            $searchableProperties
+        );
     }
 
     #endregion
@@ -717,9 +872,92 @@ abstract class AbstractRepository implements Interfaces\IRepository
     #region Public methods
 
     /**
+     * Returns the instance model from the array received by the database.
+     *
+     * @param mixed  $obj
+     * @param string $modelClass
+     *
+     * @return Interfaces\IModel|null
+     * @throws Exceptions\RepositoryException
+     * @throws ReflectionException
+     * @throws Exceptions\ReflectionException
+     */
+    public function getMappedObject(mixed $obj, string $modelClass): ?Interfaces\IModel
+    {
+        if (!isset($obj) || !$obj) {
+            return null;
+        }
+
+        $foreignKeyProperties = ReflectionUtility::getForeignKeyProperties(class: $modelClass);
+
+        foreach ($foreignKeyProperties as $foreignKeyProperty) {
+            $foreignKeyAttribute = ReflectionUtility::getAttribute($foreignKeyProperty, ForeignKey::class)->newInstance();
+
+            if ($foreignKeyAttribute instanceof Attributes\ManyToOne
+                || $foreignKeyAttribute instanceof Attributes\OneToOne
+            ) {
+                $foreignKeyClass          = $foreignKeyProperty->getType()->getName();
+                $foreignKeyReflectedClass = ReflectionUtility::getReflectionClass(class: $foreignKeyProperty->getType()->getName());
+                $foreignKeyTableName      = ReflectionUtility::getTableName(class: $foreignKeyReflectedClass);
+
+                /**
+                 * @var Attributes\ManyToOne|Attributes\OneToOne $foreignKeyAttribute
+                 */
+                $columnName = $foreignKeyAttribute->columnName;
+
+                // Removes the id from the object
+                $id = $obj[$columnName];
+                unset($obj[$columnName]);
+
+                if ($id === null) {
+                    $foreignKeyObject = null;
+                } else {
+                    $foreignKeyObject = $this->findById(
+                        id: $id,
+                        class: $foreignKeyClass,
+                        table: $foreignKeyTableName
+                    );
+
+                    if (is_null($foreignKeyObject)) {
+                        throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                    }
+                }
+            } else {
+                $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);
+                $foreignKeyPrimaryKeyColumn = ReflectionUtility::getPrimaryKeyColumnName($foreignKeyAttribute->referencedClass);
+                /**
+                 * @var Attributes\OneToMany $foreignKeyAttribute
+                 */
+                $primaryKeyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
+
+                $id = $obj[$primaryKeyProperty->name];
+
+                $foreignKeyObject = $this->select(
+                    columns: [$foreignKeyPrimaryKeyColumn],
+                    table: $foreignKeyTableName,
+                    conditions: "{$foreignKeyAttribute->referencedColumn} = :id",
+                    params: ["id" => $id]
+                );
+
+            }
+
+            $obj[$foreignKeyProperty->getName()] = $foreignKeyObject;
+        }
+
+        try {
+            $mappedObj = ORM::getNewInstance($modelClass, (array)$obj);
+        } catch (Exceptions\ORMException $ex) {
+            throw new Exceptions\RepositoryException($ex->getMessage());
+        }
+
+        return $mappedObj;
+    }
+
+    /**
      * Find all the objects filtered by the given params if any.
      *
      * @param FetchParams|null $params
+     *
      * @return FetchedData|IModel[]
      * @throws Exceptions\RepositoryException
      */
@@ -733,7 +971,30 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 ->from($this->tableName);
 
             if ($params?->getConditions()) {
-                $queryBuilder->where($params->getConditions());
+
+                $conditions = $params->getConditions();
+
+                foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
+                    /**
+                     * If this condition is true it means that there are no binds for the
+                     * found array placeholder
+                     */
+                    if (!isset($params->getBind()[$arrayBind[1]])) {
+                        continue;
+                    }
+
+                    $bindValues = $params->getBind()[$arrayBind[1]];
+
+                    $placeholders = [];
+
+                    for ($i = 0; $i < count($bindValues); $i++) {
+                        $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
+                    }
+
+                    $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
+                }
+
+                $queryBuilder->where($conditions);
             }
 
             $queryNonPaginated = $queryBuilder->getQuery();
@@ -748,7 +1009,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             $stmt->execute();
 
-            $result = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $result    = $stmt->fetchAll(PDO::FETCH_CLASS);
             $mappedArr = [];
 
             foreach ($result as $item) {
@@ -776,44 +1037,67 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Find all the records that matches the given query.
      *
-     * @param mixed $query
+     * @param mixed    $query
      * @param int|null $page
      * @param int|null $itemsPerPage
+     *
      * @return FetchedData|array
      * @throws Exceptions\RepositoryException
      */
     public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
     {
         try {
-            $conditions = null;
-            $bind = null;
+            $queryBuilder = clone $this->modelHandler->searchableFieldsQueryBuilder;
+            $placeholders = $this->modelHandler->searchableFieldsQueryBuilder->getPlaceholders();
 
-            $searchableFields = $this->modelHandler->getSearchableFields();
-
-            if (!empty($searchableFields)) {
-                $query = '%' . $query . '%';
-
-                $conditionsArray = [];
-                $bind = [];
-
-                foreach ($searchableFields as $field) {
-                    $bindPlaceholder = "query{$field}";
-
-                    $conditionsArray[] = "{$field} LIKE :{$bindPlaceholder}";
-                    $bind[$bindPlaceholder] = $query;
-                }
-
-                $conditions = implode(' OR ', $conditionsArray);
+            if (empty($placeholders)) {
+                return [];
             }
 
-            return $this->find(
-                new FetchParams(
-                    page: $page,
-                    itemsPerPage: $itemsPerPage,
-                    conditions: $conditions,
-                    bind: $bind
-                )
-            );
+            $query = '%' . $query . '%';
+
+            $binds = [];
+
+            foreach ($placeholders AS $placeholder) {
+                $binds[$placeholder] = $query;
+            }
+
+            $params = new FetchParams(page: $page, itemsPerPage: $itemsPerPage, bind: $binds);
+
+            $isPaginated = $params->getPage() !== null && $params->getItemsPerPage() !== null;
+
+            $queryNonPaginated = $queryBuilder->getQuery();
+
+            if ($isPaginated) {
+                $queryBuilder->paginate($page, $itemsPerPage);
+            }
+
+            $stmt = $this->pdo->prepare($queryBuilder->getQuery());
+
+            $this->bindParams($stmt, $params);
+
+            $stmt->execute();
+
+            $result    = $stmt->fetchAll(PDO::FETCH_CLASS);
+            $mappedArr = [];
+
+            foreach ($result as $item) {
+                $mappedArr[] = $this->getMappedObject((array)$item, $this->modelClassPathName);
+            }
+
+            if ($isPaginated) {
+                $itemsCount = $this->getItemsCount($queryNonPaginated, $params);
+                $totalPages = (int)ceil($itemsCount / $params->getItemsPerPage());
+
+                return new FetchedData(
+                    data: $mappedArr,
+                    currentPage: $params->getPage(),
+                    itemsPerPage: $params->getItemsPerPage(),
+                    totalPages: $totalPages
+                );
+            }
+
+            return $mappedArr;
         } catch (Exception $e) {
             throw new Exceptions\RepositoryException($e->getMessage());
         }
@@ -823,11 +1107,16 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Returns the first record for the given params
      *
      * @param FetchParams|null $params
+     *
      * @return IModel|null
      * @throws Exceptions\RepositoryException
      */
     public function findFirst(?FetchParams $params = null): IModel|null
     {
+        if (!$params) {
+            $params = new FetchParams();
+        }
+
         $params->setPage(0);
         $params->setItemsPerPage(1);
 
@@ -843,11 +1132,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Returns the first record found by id
      *
-     * @param $id
+     * @param             $id
      * @param string|null $class
      * @param string|null $table
+     *
      * @return IModel|null
-     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not configured properly
+     * @throws Exceptions\RepositoryException If it finds multiple results, meaning database or entities are not
+     *                                        configured properly
      */
     public function findById($id, string $class = null, string $table = null): ?Interfaces\IModel
     {
@@ -857,7 +1148,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
              * it could be called with different modelClasses and tableNames
              */
             $modelClass = $class ?? $this->modelClassPathName;
-            $tableName = $table ?? $this->tableName;
+            $tableName  = $table ?? $this->tableName;
 
             $keyProperty = ReflectionUtility::getPrimaryKeyProperty($modelClass);
 
@@ -879,6 +1170,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Save the given model
      *
      * @param Interfaces\IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
      */
@@ -907,6 +1199,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Updates the given model
      *
      * @param Interfaces\IModel $model
+     *
      * @return void
      * @throws Exceptions\RepositoryException If the database triggers an exception
      */
@@ -926,6 +1219,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
      * Deletes the model by the given id
      *
      * @param $id
+     *
      * @return void
      * @throws Exceptions\RepositoryException
      */

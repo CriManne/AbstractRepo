@@ -6,6 +6,7 @@ namespace AbstractRepo\DataModels;
 
 /**
  * Data model class to hold fetch parameters.
+ * @codeCoverageIgnore
  */
 final class FetchParams
 {

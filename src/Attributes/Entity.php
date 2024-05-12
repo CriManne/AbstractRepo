@@ -8,6 +8,7 @@ use Attribute;
 
 /**
  * Attribute that identifies a class as a database entity.
+ * @codeCoverageIgnore
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final readonly class Entity

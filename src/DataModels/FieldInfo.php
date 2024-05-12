@@ -8,8 +8,9 @@ use AbstractRepo\Enums;
 
 /**
  * Stores the information of a model's field.
+ * @codeCoverageIgnore
  */
-final class FieldInfo
+final readonly class FieldInfo
 {
     public function __construct(
         /**
@@ -19,7 +20,7 @@ final class FieldInfo
 
         /**
          * @var string|null $propertyType The type of the property.
-         * This can also be a class full path in case of a foreign key.
+         *                                This can also be a class full path in case of a foreign key.
          */
         public ?string             $propertyType,
 
@@ -27,6 +28,11 @@ final class FieldInfo
          * @var bool $isRequired Stores whether the property is required.
          */
         public bool                $isRequired,
+
+        /**
+         * @var bool $allowsNull Stores whether the property allows null.
+         */
+        public bool                $allowsNull,
 
         /**
          * @var bool $isPrimaryKey Stores whether the property is primary key.
@@ -61,7 +67,12 @@ final class FieldInfo
         /**
          * @var string|null $foreignKeyColumnType Stores the foreign key column type.
          */
-        public ?string             $foreignKeyColumnType = null
+        public ?string             $foreignKeyColumnType = null,
+
+        /**
+         * @var string|null Stores the referenced field of the one to many relationship
+         */
+        public ?string $oneToManyReferencedField = null
     )
     {
     }

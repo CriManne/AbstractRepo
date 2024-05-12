@@ -9,6 +9,7 @@ use JsonSerializable;
 
 /**
  * Data model to handle the fetched paginated data.
+ * @codeCoverageIgnore
  */
 final readonly class FetchedData implements JsonSerializable
 {

@@ -4,7 +4,8 @@
 
 ## About
 
-This  project is a small, lightweight  library for abstracting repositories  and avoiding writing a lot of repository logic. It uses [Reflection](https://www.php.net/manual/en/book.reflection.php) and [PHP 8 Attributes](https://www.php.net/manual/en/language.attributes.overview.php) on the generic and abstract class (*AbstractRepository*) that provides basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) methods.
+This  project is a small, lightweight  library for abstracting repositories  and avoiding writing a lot of repository logic. 
+It uses [Reflection](https://www.php.net/manual/en/book.reflection.php) and [PHP 8 Attributes](https://www.php.net/manual/en/language.attributes.overview.php) on the abstract class (*AbstractRepository*) that provides basic [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) methods.
 
 ### Methods available:
 - *find* :   retrieves every record
@@ -33,42 +34,92 @@ composer require crimanne/abstract-repo
 Basically, you need to define the ***Entity*** and the repository that will use it.
 
 ### Entity
-You  need to define a class  which is the entity already created in the database and give it the ***Entity*** attribute. The model must implement the ***IModel*** interface, as shown below:
+You  need to define a class which is the entity already created in the database and give it the ***Entity*** attribute. 
+The Entity attributes requires the name of the database table as parameter.
+The model must implement the ***IModel*** interface, as shown below:
+
+E.g.
 ```
-#[Entity]
+#[Entity(tableName: 'Foo')]
 class Foo implements IModel{
 
 }
 ```
 Then you need to define the fields that must match the ones in the database.
-To define a primary key, you have to use the ***Key*** attribute on the field. The attribute accepts a boolean in the constructor indicating whether the primary key is ** auto increment**.
+
+### Primary Key
+To define a primary key, you have to use the ***PrimaryKey*** attribute on the field. 
+The attribute accepts a boolean in the constructor indicating whether the primary key is **auto increment**.
+
+E.g.
 ```
 ...
-#[Key(true)]
-int $ID;
+#[PrimaryKey(autoIncrement: true)]
+public int $id,
 ...
 ```
-If you have a foreign key in the entity you can flag it with the ***ForeignKey*** attribute that requires the ***Relationship*** enum: MANY_TO_ONE, ONE_TO_ONE ( the ONE_TO_MANY relation needs to me implemented ).
-It also needs the column name on which make the foreign key.
+
+### Foreign Key (ManyToOne, OneToOne, OneToMany)
+When working with a foreign key in an entity, you can specify one of the following attributes:
+- ManyToOne: This attribute enables you to have a child object directly within the parent class.
+- OneToOne: Similar to ManyToOne, this attribute adds a constraint check when attempting to insert another
+record with the same foreign key.
+- OneToMany: This attribute allows you to specify an array containing all the related entity IDs when fetching the data.
+
+Both ManyToOne and OneToOne attributes require the **columnName** parameter to be provided in the constructor. 
+This parameter is used to map the foreign key with the column name in the database.
+
+E.g.
+
 ```
 ...
-#[ForeignKey(Relationship::MANY_TO_ONE, 'book_id')]
-RelatedModel $obj;
+#[ManyToOne(columnName: 'bar_id')
+public Bar $bar,
 ...
 ```
-You can set some field to be searched in the **findByQuery** with the _Searchable_ attribute 
+
+To have a OneToMany relation you need to declare a nullable array, this will contain all the related ids.
+The attribute requires two params:
+- referencedColumn: the database column name in the referenced table.
+- referenceClass: the referenced class
+
+In the example you can see a OneToMany relationship between Author and Book.
+In the table book there must be the column author_id in order to complete the relationship.
+
+```
+#[Entity('Author')
+class Author implements IModel
+    ...
+    #[OneToMany(
+        referencedColumn: 'author_id',
+        referencedClass: Book::class
+    )]
+    public ?array $books = null
+    ...
+```
+### Searchable
+The repository offers an utility method called **findByQuery** that will accept a query search term, and it will
+retrieve all the records that match (even partially) that query.
+In order to do that you need to specify in the model which fields can be included in the
+research by using the attribute **Searchable**.
+If the attribute is put on a OneToOne or ManyToOne relationship property, the method will also
+look for all the searchable fields in the related model.
+Please note that this process will get only the searchable fields of the direct related entity, and
+it will not go further than one level of nesting.
+
+E.g.
 ```
 ...
 #[Searchable]
-string $field;
+public string $field,
 ...
 ```
 
-**PLEASE NOTE:** The entity needs the explicit constructor with all the args in order to work.
-
 ### Repository
-After defining the entity, you have to create the repository that must extends the ***AbstractRepository*** class and implements the ***IRepository*** interface.
-Then you need to define the ***getModel*** method to return the classname of the entity as follows:
+After defining the entity, you have to create the repository that must extends the ***AbstractRepository*** class.
+Then you need to define the ***getModel*** method to return the classname of the entity that you want to handle in that repository.
+
+E.g.
 ```
 class FooRepository extends AbstractRepository implements IRepository{
       
@@ -81,20 +132,17 @@ class FooRepository extends AbstractRepository implements IRepository{
 }
 ```
 The repository needs a PDO instance in construction, this can also be done with [Dependency Injection](https://php-di.org/doc/understanding-di.html).
-\
-\
-Finally you can use the methods of the library.
-#
+
 
 ## Demo
 
 A small demo project can be found in the ***[demo/](demo/)*** folder
 
-## Future implementations
-
-- Implementing the ***ONE_TO_MANY*** relationship.
-
 #
-Copyright 2023 by [Cristian Mannella](http://www.cristianmannella.it)
 
-Released under the [MIT License](LICENSE)
+Copyright 2024 by [Cristian Mannella](https://cristianmannella.vercel.app/)
+
+[AbstractRepo](https://github.com/CriManne/AbstractRepo) by [Cristian Mannella](https://cristianmannella.vercel.app/) is licensed under [Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International](https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1) 
+
+![CC](https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1) ![BY](https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1) ![NC](https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1) ![ND](https://mirrors.creativecommons.org/presskit/icons/nd.svg?ref=chooser-v1)
+ 
