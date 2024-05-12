@@ -149,32 +149,6 @@ class QueryBuilder
     }
 
     /**
-     * Appends an and where statement to the query
-     *
-     * @param string $condition
-     *
-     * @return $this
-     */
-    public function andWhere(string $condition): self
-    {
-        $this->append("AND {$condition}");
-        return $this;
-    }
-
-    /**
-     * Appends an or where statement to the query
-     *
-     * @param string $condition
-     *
-     * @return $this
-     */
-    public function orWhere(string $condition): self
-    {
-        $this->append("OR {$condition}");
-        return $this;
-    }
-
-    /**
      * Appends a left join statement to the query
      *
      * @param string $condition
@@ -224,19 +198,6 @@ class QueryBuilder
     public function getQuery(): string
     {
         return $this->query;
-    }
-
-    /**
-     * Adds a placeholder to the current placeholders array.
-     *
-     * @param string $placeholder
-     *
-     * @return self
-     */
-    public function addPlaceholder(string $placeholder): self
-    {
-        $this->placeholders[] = $placeholder;
-        return $this;
     }
 
     /**

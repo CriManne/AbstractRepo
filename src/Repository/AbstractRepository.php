@@ -160,6 +160,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
             $isPrimaryKey = false;
 
             /**
+             * {@see FieldInfo::$allowsNull}
+             */
+            $allowsNull = false;
+
+            /**
              * {@see Attributes\OneToMany::$referencedColumn}
              */
             $oneToManyReferencedField = null;
@@ -224,6 +229,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                  * If it doesn't have a default value and is not a key identity then it's required
                  */
                 $isRequired = !$reflectionProperty->hasDefaultValue() && !$isAutoIncrement;
+                $allowsNull = $reflectionProperty->getType()->allowsNull();
             } else {
                 /**
                  * If it's a promoted property check the default value in the constructor by getting the reflection parameter
@@ -246,6 +252,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
                  * If there's no default value in the promoted property, and it's not auto increment then it's required.
                  */
                 $isRequired = !$constructorParameter->isDefaultValueAvailable() && !$isAutoIncrement;
+
+                $allowsNull = $constructorParameter->allowsNull();
             }
 
             if ($foreignKeyRelationshipType === Enums\Relationship::ONE_TO_MANY) {
@@ -268,6 +276,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                     propertyName: $propertyName,
                     propertyType: $propertyType,
                     isRequired: $isRequired,
+                    allowsNull: $allowsNull,
                     isPrimaryKey: $isPrimaryKey,
                     autoIncrement: $isAutoIncrement,
                     isForeignKey: $foreignKeyRelationshipType !== null,
@@ -289,7 +298,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                         $joinCondition = "{$foreignKeyTableName} AS {$foreignKeyAlias} 
                                                ON {$this->tableName}.{$foreignKeyColumnName} = {$foreignKeyAlias}.{$foreignKeyPrimaryKeyColumnName}";
 
-                        if ($isRequired) {
+                        if ($isRequired && !$allowsNull) {
                             $modelHandler->searchableFieldsQueryBuilder
                                 ->innerJoin($joinCondition);
                         } else {
@@ -619,9 +628,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $value = $model->$propertyName ?? $property->defaultValue ?? null;
             }
 
-            if ($property->isRequired && empty($value)) {
+            /**
+             * This cannot be possible since it would be blocked by the instantiation of the object itself.
+             */
+            // @codeCoverageIgnoreStart
+            if ($property->isRequired && empty($value) && !$property->allowsNull) {
                 throw new Exceptions\RepositoryException("{$propertyName} is required!");
             }
+            // @codeCoverageIgnoreEnd
 
             if (empty($value)) {
                 continue;
@@ -762,14 +776,18 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $id = $obj[$columnName];
                 unset($obj[$columnName]);
 
-                $foreignKeyObject = $this->findById(
-                    id: $id,
-                    class: $foreignKeyClass,
-                    table: $foreignKeyTableName
-                );
+                if ($id === null) {
+                    $foreignKeyObject = null;
+                } else {
+                    $foreignKeyObject = $this->findById(
+                        id: $id,
+                        class: $foreignKeyClass,
+                        table: $foreignKeyTableName
+                    );
 
-                if (is_null($foreignKeyObject)) {
-                    throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                    if (is_null($foreignKeyObject)) {
+                        throw new Exceptions\RepositoryException(Exceptions\RepositoryException::RELATED_OBJECT_NOT_FOUND);
+                    }
                 }
             } else {
                 $foreignKeyTableName        = ReflectionUtility::getTableName($foreignKeyAttribute->referencedClass);

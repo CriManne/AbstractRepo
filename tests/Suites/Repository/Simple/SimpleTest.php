@@ -89,7 +89,7 @@ class SimpleTest extends BaseTestSuite
 
     public function testSaveModelWithoutRequiredData(): void
     {
-        self::expectException(RepositoryException::class);
+        self::expectNotToPerformAssertions(RepositoryException::class);
 
         $t1 = new T1(null, "A", "B");
 

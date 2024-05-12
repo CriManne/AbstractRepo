@@ -30,6 +30,11 @@ final readonly class FieldInfo
         public bool                $isRequired,
 
         /**
+         * @var bool $allowsNull Stores whether the property allows null.
+         */
+        public bool                $allowsNull,
+
+        /**
          * @var bool $isPrimaryKey Stores whether the property is primary key.
          */
         public bool                $isPrimaryKey,

@@ -19,6 +19,7 @@ class ModelHandlerTest extends TestCase
                     propertyName: "FIELD1",
                     propertyType: "string",
                     isRequired: true,
+                    allowsNull: false,
                     isPrimaryKey: true,
                     autoIncrement: false,
                     isForeignKey: false,
