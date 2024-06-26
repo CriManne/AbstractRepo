@@ -859,6 +859,19 @@ abstract class AbstractRepository implements Interfaces\IRepository
         );
     }
 
+    /**
+     * Returns the default ordering
+     * @return string[]
+     * @throws RepositoryException
+     */
+    private function getDefaultOrderBy(): array
+    {
+        $firstProperty = array_values($this->modelHandler->get())[0];
+        $columnName = $firstProperty->foreignKeyColumnName ?? $firstProperty->propertyName;
+
+        return ["{$columnName} " . QueryBuilder::ORDER_ASC];
+    }
+
     #endregion
 
     #region Public methods
@@ -985,6 +998,10 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
                 $queryBuilder->where($conditions);
             }
+
+            $orderBy = $params?->getOrderBy() ?? $this->getDefaultOrderBy();
+
+            $queryBuilder->orderBy($orderBy);
 
             $queryNonPaginated = $queryBuilder->getQuery();
 

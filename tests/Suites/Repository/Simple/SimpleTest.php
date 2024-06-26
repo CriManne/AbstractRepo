@@ -641,4 +641,39 @@ class SimpleTest extends BaseTestSuite
 
         self::$orderRepository->delete(1);
     }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testOrderBy(): void
+    {
+        $t21 = new T2("AAA", "aword");
+        $t22 = new T2("BBB", "bword");
+        $t23 = new T2("CCC", "cword");
+
+        self::$t2Repository->save($t21);
+        self::$t2Repository->save($t22);
+        self::$t2Repository->save($t23);
+
+        self::assertEquals("cword", self::$t2Repository->find(new FetchParams(orderBy: ["v1 DESC"]))[0]->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testOrderByMultiple(): void
+    {
+        $t21 = new T2("AAA", "aword");
+        $t22 = new T2("BBB", "aword");
+        $t23 = new T2("CCC", "cword");
+
+        self::$t2Repository->save($t21);
+        self::$t2Repository->save($t22);
+        self::$t2Repository->save($t23);
+
+        self::assertEquals("BBB", self::$t2Repository->find(new FetchParams(orderBy: ["v1 DESC", "id DESC"]))[1]->id);
+    }
+
 }

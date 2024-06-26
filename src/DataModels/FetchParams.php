@@ -11,16 +11,18 @@ namespace AbstractRepo\DataModels;
 final class FetchParams
 {
     /**
-     * @param int|null $page
-     * @param int|null $itemsPerPage
+     * @param int|null    $page
+     * @param int|null    $itemsPerPage
      * @param string|null $conditions
-     * @param array|null $bind
+     * @param array|null  $bind
+     * @param array|null  $orderBy
      */
     public function __construct(
         private ?int             $page = null,
         private ?int             $itemsPerPage = null,
         private readonly ?string $conditions = null,
-        private readonly ?array  $bind = null
+        private readonly ?array  $bind = null,
+        private readonly ?array $orderBy = null,
     )
     {
     }
@@ -55,6 +57,14 @@ final class FetchParams
     public function getBind(): ?array
     {
         return $this->bind;
+    }
+
+    /**
+     * @return array|null
+     */
+    public function getOrderBy(): ?array
+    {
+        return $this->orderBy;
     }
 
     /**
