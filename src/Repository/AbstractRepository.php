@@ -110,8 +110,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     private function processModel(ReflectionClass $reflectionClass, ModelHandler $modelHandler): void
     {
         $modelHandler->searchableFieldsQueryBuilder
-            ->select(["{$this->tableName}.*"])
-            ->from("{$this->tableName} AS {$this->tableName}");
+            ->select(["`{$this->tableName}`.*"])
+            ->from(from: $this->tableName, alias: $this->tableName);
 
         $searchablePlaceholders = [];
         $searchableConditions = [];
@@ -295,7 +295,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                         $foreignKeyAlias = $foreignKeyTableName . $propertyName;
                         $foreignKeyPrimaryKeyColumnName = ReflectionUtility::getPrimaryKeyColumnName($propertyType);
 
-                        $joinCondition = "{$foreignKeyTableName} AS {$foreignKeyAlias} 
+                        $joinCondition = "`{$foreignKeyTableName}` AS {$foreignKeyAlias} 
                                                ON {$this->tableName}.{$foreignKeyColumnName} = {$foreignKeyAlias}.{$foreignKeyPrimaryKeyColumnName}";
 
                         if ($isRequired && !$allowsNull) {
@@ -322,14 +322,14 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 } else {
                     $placeHolder = "{$this->tableName}{$propertyName}";
 
-                    $searchableConditions[] = "{$this->tableName}.{$propertyName} LIKE :{$placeHolder}";
+                    $searchableConditions[] = "`{$this->tableName}`.{$propertyName} LIKE :{$placeHolder}";
                     $searchablePlaceholders[] = $placeHolder;
                 }
             }
         }
 
         $modelHandler->searchableFieldsQueryBuilder
-            ->where(implode(" OR ", $searchableConditions))
+            ->where("(" . implode(" OR ", $searchableConditions) . ")")
             ->addPlaceholders($searchablePlaceholders);
     }
 
@@ -432,10 +432,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
          */
         $modelData = $this->getModelData($model);
 
-        if (count($modelData) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
-        }
-
         /**
          * Get an array with just the columns names
          */
@@ -474,10 +470,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
          * Retrieves all the data from the given model.
          */
         $modelData = $this->getModelData($model);
-
-        if (count($modelData) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
-        }
 
         $keyProp = $this->modelHandler->getKey();
 
@@ -637,15 +629,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
             }
             // @codeCoverageIgnoreEnd
 
-            if (empty($value)) {
-                continue;
-            }
-
             // Array to store all the information to create the insert
             $values[] = new ModelField(
                 fieldName: $propertyName,
                 fieldType: $propertyType,
-                fieldValue: $value
+                fieldValue: $value ?? null
             );
 
         }
@@ -749,7 +737,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
     {
         foreach ($values as $value) {
-            $type = PDOUtil::getPDOType($value->fieldType);
+            if ($value->fieldValue === null) {
+                $type = PDOUtil::NULL_TYPE;
+            } else {
+                $type = PDOUtil::getPDOType($value->fieldType);
+            }
 
             $placeholder = QueryBuilder::BIND_CHAR . $value->fieldName;
             $value       = $value->fieldValue;
@@ -771,7 +763,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     {
         $query = (new QueryBuilder())
             ->select(["COUNT(*) as itemsCount"])
-            ->from("({$subquery}) AS subquery")
+            ->from(from: "({$subquery})", alias: "subquery", useBacktick: false)
             ->getQuery();
 
         $stmt = $this->pdo->prepare($query);
@@ -865,6 +857,52 @@ abstract class AbstractRepository implements Interfaces\IRepository
             fn(\ReflectionProperty $property) => ReflectionUtility::getColumnName($class, $property->name),
             $searchableProperties
         );
+    }
+
+    /**
+     * Returns the default ordering
+     * @return string[]
+     * @throws RepositoryException
+     */
+    private function getDefaultOrderBy(): array
+    {
+        $firstProperty = array_values($this->modelHandler->get())[0];
+        $columnName = $firstProperty->foreignKeyColumnName ?? $firstProperty->propertyName;
+
+        return ["{$columnName} " . QueryBuilder::ORDER_ASC];
+    }
+
+    /**
+     * Process the given params to the given query builder
+     * @param FetchParams  $params
+     *
+     * @return string
+     */
+    private function getWhereConditions(FetchParams $params): string
+    {
+        $conditions = $params->getConditions();
+
+        foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
+            /**
+             * If this condition is true it means that there are no binds for the
+             * found array placeholder
+             */
+            if (!isset($params->getBind()[$arrayBind[1]])) {
+                continue;
+            }
+
+            $bindValues = $params->getBind()[$arrayBind[1]];
+
+            $placeholders = [];
+
+            for ($i = 0; $i < count($bindValues); $i++) {
+                $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
+            }
+
+            $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
+        }
+
+        return $conditions;
     }
 
     #endregion
@@ -968,31 +1006,12 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 ->from($this->tableName);
 
             if ($params?->getConditions()) {
-
-                $conditions = $params->getConditions();
-
-                foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
-                    /**
-                     * If this condition is true it means that there are no binds for the
-                     * found array placeholder
-                     */
-                    if (!isset($params->getBind()[$arrayBind[1]])) {
-                        continue;
-                    }
-
-                    $bindValues = $params->getBind()[$arrayBind[1]];
-
-                    $placeholders = [];
-
-                    for ($i = 0; $i < count($bindValues); $i++) {
-                        $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
-                    }
-
-                    $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
-                }
-
-                $queryBuilder->where($conditions);
+                $queryBuilder->where($this->getWhereConditions($params));
             }
+
+            $orderBy = $params?->getOrderBy() ?? $this->getDefaultOrderBy();
+
+            $queryBuilder->orderBy($orderBy);
 
             $queryNonPaginated = $queryBuilder->getQuery();
 
@@ -1034,14 +1053,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Find all the records that matches the given query.
      *
-     * @param mixed    $query
-     * @param int|null $page
-     * @param int|null $itemsPerPage
+     * @param mixed            $query
+     * @param FetchParams|null $params
      *
      * @return FetchedData|array
-     * @throws Exceptions\RepositoryException
+     * @throws RepositoryException
      */
-    public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
+    public function findByQuery(mixed $query, ?FetchParams $params = null): FetchedData|array
     {
         try {
             $queryBuilder = clone $this->modelHandler->searchableFieldsQueryBuilder;
@@ -1059,14 +1077,20 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $binds[$placeholder] = $query;
             }
 
-            $params = new FetchParams(page: $page, itemsPerPage: $itemsPerPage, bind: $binds);
+            if ($params?->getConditions()) {
+                $queryBuilder->where("AND " . $this->getWhereConditions($params));
+            }
+
+            $binds = array_merge($binds, $params?->getBind() ?? []);
+
+            $params = new FetchParams(page: $params?->getPage(), itemsPerPage: $params?->getItemsPerPage(), bind: $binds);
 
             $isPaginated = $params->getPage() !== null && $params->getItemsPerPage() !== null;
 
             $queryNonPaginated = $queryBuilder->getQuery();
 
             if ($isPaginated) {
-                $queryBuilder->paginate($page, $itemsPerPage);
+                $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
             }
 
             $stmt = $this->pdo->prepare($queryBuilder->getQuery());

@@ -16,6 +16,9 @@ class QueryBuilder
      */
     public const string BIND_CHAR = ':';
 
+    public const string ORDER_ASC = 'ASC';
+    public const string ORDER_DESC = 'DESC';
+
     /**
      * Regex used to identify an array bind
      */
@@ -34,6 +37,12 @@ class QueryBuilder
      * @var array
      */
     private array $placeholders = [];
+
+    /**
+     * Flag that indicates whether the where clause was already used
+     * @var bool
+     */
+    private bool $alreadyUsedWhere = false;
 
     /**
      * @param string|null $conditions
@@ -87,7 +96,7 @@ class QueryBuilder
      */
     public function insert(string $table, array $columns): self
     {
-        $this->append("INSERT INTO {$table}");
+        $this->append("INSERT INTO `{$table}`");
         $this->append("(" . implode(",", $columns) . ")");
         $this->append("VALUES");
         $this->append("(" . implode(",", array_map(fn($val) => self::BIND_CHAR . "{$val}", $columns)) . ");");
@@ -104,7 +113,7 @@ class QueryBuilder
      */
     public function update(string $table, array $columns): self
     {
-        $this->append("UPDATE {$table} SET");
+        $this->append("UPDATE `{$table}` SET");
         $this->append(implode(',', array_map(fn($val) => "{$val} = " . self::BIND_CHAR . $val, $columns)));
         return $this;
     }
@@ -118,20 +127,31 @@ class QueryBuilder
      */
     public function delete(string $tableName): self
     {
-        $this->append("DELETE FROM {$tableName}");
+        $this->append("DELETE FROM `{$tableName}`");
         return $this;
     }
 
     /**
      * Appends a from statement to the query
      *
-     * @param string $from
+     * @param string      $from
+     * @param string|null $alias
+     * @param bool        $useBacktick
      *
      * @return $this
      */
-    public function from(string $from): self
+    public function from(string $from, ?string $alias = null, bool $useBacktick = true): self
     {
-        $this->append("FROM {$from}");
+        if ($useBacktick) {
+            $this->append("FROM `{$from}`");
+        } else {
+            $this->append("FROM {$from}");
+        }
+
+
+        if ($alias) {
+            $this->append(" AS `{$alias}`");
+        }
         return $this;
     }
 
@@ -144,7 +164,12 @@ class QueryBuilder
      */
     public function where(string $condition): self
     {
-        $this->append("WHERE {$condition}");
+        if ($this->alreadyUsedWhere) {
+            $this->append("{$condition}");
+        } else {
+            $this->alreadyUsedWhere = true;
+            $this->append("WHERE {$condition}");
+        }
         return $this;
     }
 
@@ -187,6 +212,15 @@ class QueryBuilder
         $offset = $page * $itemsPerPage;
 
         $this->append("LIMIT {$itemsPerPage} OFFSET {$offset}");
+
+        return $this;
+    }
+
+    public function orderBy(array $orderBy): self
+    {
+        $imploded = implode(',', $orderBy);
+
+        $this->append("ORDER BY {$imploded}");
 
         return $this;
     }

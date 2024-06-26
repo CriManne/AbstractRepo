@@ -113,32 +113,6 @@ class AbstractRepositoryTest extends TestCase
      * @return void
      * @throws AbstractRepositoryException
      * @throws PHPUnit\Framework\MockObject\Exception
-     */
-    public function testNullModelSave(): void
-    {
-        $this->expectExceptionMessage(AbstractRepositoryException::NO_MODEL_DATA_FOUND);
-
-        (new ValidRepositoryNullable($this->createMock(PDO::class)))
-            ->save(new ModelNullable());
-    }
-
-    /**
-     * @return void
-     * @throws AbstractRepositoryException
-     * @throws PHPUnit\Framework\MockObject\Exception
-     */
-    public function testNullModelUpdate(): void
-    {
-        $this->expectExceptionMessage(AbstractRepositoryException::NO_MODEL_DATA_FOUND);
-
-        (new ValidRepositoryNullable($this->createMock(PDO::class)))
-            ->update(new ModelNullable());
-    }
-
-    /**
-     * @return void
-     * @throws AbstractRepositoryException
-     * @throws PHPUnit\Framework\MockObject\Exception
      * @throws ReflectionException
      */
     public function testGetPropertyValueRecursiveInvalidForeignKeyObject(): void

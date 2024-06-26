@@ -18,3 +18,17 @@ CREATE TABLE T2
     v1 varchar(255) not null,
     PRIMARY KEY (id)
 );
+
+CREATE TABLE T3
+(
+    id int          not null AUTO_INCREMENT,
+    v1 varchar(255) null,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE `Order`
+(
+    id int          not null,
+    v1 varchar(255) null,
+    PRIMARY KEY (id)
+);

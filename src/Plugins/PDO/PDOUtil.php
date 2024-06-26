@@ -8,6 +8,8 @@ use PDO;
 
 class PDOUtil
 {
+    public const int NULL_TYPE = PDO::PARAM_NULL;
+
     /**
      * Returns the PDO type from the PHP type.
      *

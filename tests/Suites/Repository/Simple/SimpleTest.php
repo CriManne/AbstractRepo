@@ -7,16 +7,22 @@ namespace AbstractRepo\Test\Suites\Repository\Simple;
 use AbstractRepo\DataModels\FetchParams;
 use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Suites\Repository\BaseTestSuite;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\Order;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T1;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T3;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\OrderRepository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T1Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T2Repository;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\T3Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\TestInvalidModelRepository;
 
 class SimpleTest extends BaseTestSuite
 {
-    public static T1Repository $t1Repository;
-    public static T2Repository $t2Repository;
+    public static T1Repository    $t1Repository;
+    public static T2Repository    $t2Repository;
+    public static T3Repository    $t3Repository;
+    public static OrderRepository $orderRepository;
 
     public function __construct(string $name)
     {
@@ -32,10 +38,14 @@ class SimpleTest extends BaseTestSuite
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
         self::$pdo->exec("TRUNCATE TABLE T1;");
         self::$pdo->exec("TRUNCATE TABLE T2;");
+        self::$pdo->exec("TRUNCATE TABLE T3;");
+        self::$pdo->exec("TRUNCATE TABLE `Order`;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
-        self::$t1Repository = new T1Repository(self::$pdo);
-        self::$t2Repository = new T2Repository(self::$pdo);
+        self::$t1Repository    = new T1Repository(self::$pdo);
+        self::$t2Repository    = new T2Repository(self::$pdo);
+        self::$t3Repository    = new T3Repository(self::$pdo);
+        self::$orderRepository = new OrderRepository(self::$pdo);
     }
 
     /**
@@ -77,7 +87,9 @@ class SimpleTest extends BaseTestSuite
 
     /**
      * @dataProvider providerT1Model
+     *
      * @param T1 $t1
+     *
      * @return void
      * @throws RepositoryException
      */
@@ -98,7 +110,9 @@ class SimpleTest extends BaseTestSuite
 
     /**
      * @dataProvider providerT1Model
+     *
      * @param T1 $t1
+     *
      * @return void
      * @throws RepositoryException
      */
@@ -321,8 +335,7 @@ class SimpleTest extends BaseTestSuite
             2,
             self::$t1Repository->findByQuery(
                 query: "foo",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()[1]->id
         );
 
@@ -330,23 +343,23 @@ class SimpleTest extends BaseTestSuite
             1,
             self::$t1Repository->findByQuery(
                 query: "aaa",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()
         );
 
         $this->assertEmpty(
             self::$t1Repository->findByQuery(
                 query: "wrongsearchquery",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()
         );
     }
 
     /**
      * @dataProvider providerT2Model
+     *
      * @param T2 $t2
+     *
      * @return void
      * @throws RepositoryException
      */
@@ -358,7 +371,9 @@ class SimpleTest extends BaseTestSuite
 
     /**
      * @dataProvider providerT2Model
+     *
      * @param T2 $t2
+     *
      * @return void
      * @throws RepositoryException
      */
@@ -486,5 +501,232 @@ class SimpleTest extends BaseTestSuite
         }
 
         $this->assertEquals(15, self::$t1Repository->find(new FetchParams(page: 0, itemsPerPage: 1, conditions: "id >= 130 AND id < 145"))->getTotalPages());
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSaveNullModel(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $t = new T3();
+        self::$t3Repository->save($t);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testUpdateNullModel(): void
+    {
+        $t = new T3();
+        self::$t3Repository->save($t);
+
+        $t->v1 = "AB";
+
+        self::$t3Repository->update($t);
+
+        self::assertEquals("AB", self::$t3Repository->findById(1)->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testUpdateToNullNullableField(): void
+    {
+        $t = new T1(100, "test", "value");
+        self::$t1Repository->save($t);
+
+        $t->v2 = null;
+        self::$t1Repository->update($t);
+
+        self::assertEquals(null, self::$t1Repository->findById($t->id)->v2);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelSave(): void
+    {
+        self::expectNotToPerformAssertions();
+
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelFindById(): void
+    {
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+
+        self::assertEquals("test", self::$orderRepository->findById(1)->v1);
+    }
+
+    /**
+     * @depends testKeywordModelFindById
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelUpdate(): void
+    {
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+
+        $order->v1 = "update";
+        self::$orderRepository->update($order);
+
+
+        self::assertEquals("update", self::$orderRepository->findById(1)->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelFindByQuery(): void
+    {
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+
+        self::assertEquals("test", self::$orderRepository->findByQuery("es")[0]->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelFindFirst(): void
+    {
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+
+        self::assertEquals("test", self::$orderRepository->findFirst(new FetchParams(conditions: "v1 LIKE :query", bind: ["query" => "%est%"]))->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelFind(): void
+    {
+        for ($i = 100; $i < 240; $i++) {
+            $order = new Order($i, "test" . $i);
+            self::$orderRepository->save($order);
+        }
+
+        self::assertEquals(15, self::$orderRepository->find(new FetchParams(page: 0, itemsPerPage: 1, conditions: "id >= 130 AND id < 145"))->getTotalPages());
+    }
+
+    /**
+     * @depends testKeywordModelSave
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testKeywordModelDelete(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $order = new Order(1, "test");
+        self::$orderRepository->save($order);
+
+        self::$orderRepository->delete(1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testOrderBy(): void
+    {
+        $t21 = new T2("AAA", "aword");
+        $t22 = new T2("BBB", "bword");
+        $t23 = new T2("CCC", "cword");
+
+        self::$t2Repository->save($t21);
+        self::$t2Repository->save($t22);
+        self::$t2Repository->save($t23);
+
+        self::assertEquals("cword", self::$t2Repository->find(new FetchParams(orderBy: ["v1 DESC"]))[0]->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testOrderByMultiple(): void
+    {
+        $t21 = new T2("AAA", "aword");
+        $t22 = new T2("BBB", "aword");
+        $t23 = new T2("CCC", "cword");
+
+        self::$t2Repository->save($t21);
+        self::$t2Repository->save($t22);
+        self::$t2Repository->save($t23);
+
+        self::assertEquals("BBB", self::$t2Repository->find(new FetchParams(orderBy: ["v1 DESC", "id DESC"]))[1]->id);
+    }
+
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSearchByQueryMoreConditions(): void
+    {
+        $t1 = new T1(1, "testfoobar", "test");
+        $t2 = new T1(2, "fooBAR00", "aaaa");
+        $t3 = new T1(3, "foebar00", "foobar");
+        $t4 = new T1(4, "testwrong", "foobar");
+
+        self::$t1Repository->save($t1);
+        self::$t1Repository->save($t2);
+        self::$t1Repository->save($t3);
+        self::$t1Repository->save($t4);
+
+        $this->assertCount(
+            2,
+            self::$t1Repository->findByQuery(
+                query: "foo",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2",
+                    bind: ["v2" => "foobar"]
+                )
+            )->getData()
+        );
+
+        $this->assertCount(
+            1,
+            self::$t1Repository->findByQuery(
+                query: "foebar",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2",
+                    bind: ["v2" => "foobar"]
+                )
+            )->getData()
+        );
+
+        $this->assertCount(
+            2,
+            self::$t1Repository->findByQuery(
+                query: "foo",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2 AND v2 <> :v2not",
+                    bind: ["v2" => "foobar", "v2not" => "aaaa"]
+                )
+            )->getData()
+        );
     }
 }
