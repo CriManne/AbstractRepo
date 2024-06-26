@@ -9,14 +9,17 @@ use AbstractRepo\Exceptions\RepositoryException;
 use AbstractRepo\Test\Suites\Repository\BaseTestSuite;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T1;
 use AbstractRepo\Test\Suites\Repository\Simple\Models\T2;
+use AbstractRepo\Test\Suites\Repository\Simple\Models\T3;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T1Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\T2Repository;
+use AbstractRepo\Test\Suites\Repository\Simple\Repository\T3Repository;
 use AbstractRepo\Test\Suites\Repository\Simple\Repository\TestInvalidModelRepository;
 
 class SimpleTest extends BaseTestSuite
 {
     public static T1Repository $t1Repository;
     public static T2Repository $t2Repository;
+    public static T3Repository $t3Repository;
 
     public function __construct(string $name)
     {
@@ -32,10 +35,12 @@ class SimpleTest extends BaseTestSuite
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
         self::$pdo->exec("TRUNCATE TABLE T1;");
         self::$pdo->exec("TRUNCATE TABLE T2;");
+        self::$pdo->exec("TRUNCATE TABLE T3;");
         self::$pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
         self::$t1Repository = new T1Repository(self::$pdo);
         self::$t2Repository = new T2Repository(self::$pdo);
+        self::$t3Repository = new T3Repository(self::$pdo);
     }
 
     /**
@@ -486,5 +491,48 @@ class SimpleTest extends BaseTestSuite
         }
 
         $this->assertEquals(15, self::$t1Repository->find(new FetchParams(page: 0, itemsPerPage: 1, conditions: "id >= 130 AND id < 145"))->getTotalPages());
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSaveNullModel(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $t = new T3();
+        self::$t3Repository->save($t);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testUpdateNullModel(): void
+    {
+        $t = new T3();
+        self::$t3Repository->save($t);
+
+        $t->v1 = "AB";
+
+        self::$t3Repository->update($t);
+
+        self::assertEquals("AB", self::$t3Repository->findById(1)->v1);
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testUpdateToNullNullableField(): void
+    {
+        $t = new T1(100, "test", "value");
+        self::$t1Repository->save($t);
+
+        $t->v2 = null;
+        self::$t1Repository->update($t);
+
+        self::assertEquals(null, self::$t1Repository->findById($t->id)->v2);
     }
 }
