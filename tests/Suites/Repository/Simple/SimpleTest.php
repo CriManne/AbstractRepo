@@ -335,8 +335,7 @@ class SimpleTest extends BaseTestSuite
             2,
             self::$t1Repository->findByQuery(
                 query: "foo",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()[1]->id
         );
 
@@ -344,16 +343,14 @@ class SimpleTest extends BaseTestSuite
             1,
             self::$t1Repository->findByQuery(
                 query: "aaa",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()
         );
 
         $this->assertEmpty(
             self::$t1Repository->findByQuery(
                 query: "wrongsearchquery",
-                page: 0,
-                itemsPerPage: 10
+                params: new FetchParams(page:0, itemsPerPage: 10)
             )->getData()
         );
     }
@@ -676,4 +673,60 @@ class SimpleTest extends BaseTestSuite
         self::assertEquals("BBB", self::$t2Repository->find(new FetchParams(orderBy: ["v1 DESC", "id DESC"]))[1]->id);
     }
 
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSearchByQueryMoreConditions(): void
+    {
+        $t1 = new T1(1, "testfoobar", "test");
+        $t2 = new T1(2, "fooBAR00", "aaaa");
+        $t3 = new T1(3, "foebar00", "foobar");
+        $t4 = new T1(4, "testwrong", "foobar");
+
+        self::$t1Repository->save($t1);
+        self::$t1Repository->save($t2);
+        self::$t1Repository->save($t3);
+        self::$t1Repository->save($t4);
+
+        $this->assertCount(
+            2,
+            self::$t1Repository->findByQuery(
+                query: "foo",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2",
+                    bind: ["v2" => "foobar"]
+                )
+            )->getData()
+        );
+
+        $this->assertCount(
+            1,
+            self::$t1Repository->findByQuery(
+                query: "foebar",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2",
+                    bind: ["v2" => "foobar"]
+                )
+            )->getData()
+        );
+
+        $this->assertCount(
+            2,
+            self::$t1Repository->findByQuery(
+                query: "foo",
+                params: new FetchParams(
+                    page: 0,
+                    itemsPerPage: 10,
+                    conditions: "v2 = :v2 AND v2 <> :v2not",
+                    bind: ["v2" => "foobar", "v2not" => "aaaa"]
+                )
+            )->getData()
+        );
+    }
 }

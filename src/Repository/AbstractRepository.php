@@ -329,7 +329,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
         }
 
         $modelHandler->searchableFieldsQueryBuilder
-            ->where(implode(" OR ", $searchableConditions))
+            ->where("(" . implode(" OR ", $searchableConditions) . ")")
             ->addPlaceholders($searchablePlaceholders);
     }
 
@@ -872,6 +872,39 @@ abstract class AbstractRepository implements Interfaces\IRepository
         return ["{$columnName} " . QueryBuilder::ORDER_ASC];
     }
 
+    /**
+     * Process the given params to the given query builder
+     * @param FetchParams  $params
+     *
+     * @return string
+     */
+    private function getWhereConditions(FetchParams $params): string
+    {
+        $conditions = $params->getConditions();
+
+        foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
+            /**
+             * If this condition is true it means that there are no binds for the
+             * found array placeholder
+             */
+            if (!isset($params->getBind()[$arrayBind[1]])) {
+                continue;
+            }
+
+            $bindValues = $params->getBind()[$arrayBind[1]];
+
+            $placeholders = [];
+
+            for ($i = 0; $i < count($bindValues); $i++) {
+                $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
+            }
+
+            $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
+        }
+
+        return $conditions;
+    }
+
     #endregion
 
     #region Public methods
@@ -973,30 +1006,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 ->from($this->tableName);
 
             if ($params?->getConditions()) {
-
-                $conditions = $params->getConditions();
-
-                foreach (QueryBuilder::findArrayBinds($conditions) as $arrayBind) {
-                    /**
-                     * If this condition is true it means that there are no binds for the
-                     * found array placeholder
-                     */
-                    if (!isset($params->getBind()[$arrayBind[1]])) {
-                        continue;
-                    }
-
-                    $bindValues = $params->getBind()[$arrayBind[1]];
-
-                    $placeholders = [];
-
-                    for ($i = 0; $i < count($bindValues); $i++) {
-                        $placeholders[] = QueryBuilder::BIND_CHAR . $arrayBind[1] . $i;
-                    }
-
-                    $conditions = str_replace($arrayBind[0], implode(',', $placeholders), $conditions);
-                }
-
-                $queryBuilder->where($conditions);
+                $queryBuilder->where($this->getWhereConditions($params));
             }
 
             $orderBy = $params?->getOrderBy() ?? $this->getDefaultOrderBy();
@@ -1043,14 +1053,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
     /**
      * Find all the records that matches the given query.
      *
-     * @param mixed    $query
-     * @param int|null $page
-     * @param int|null $itemsPerPage
+     * @param mixed            $query
+     * @param FetchParams|null $params
      *
      * @return FetchedData|array
-     * @throws Exceptions\RepositoryException
+     * @throws RepositoryException
      */
-    public function findByQuery(mixed $query, ?int $page = null, ?int $itemsPerPage = null): FetchedData|array
+    public function findByQuery(mixed $query, ?FetchParams $params = null): FetchedData|array
     {
         try {
             $queryBuilder = clone $this->modelHandler->searchableFieldsQueryBuilder;
@@ -1068,14 +1077,20 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 $binds[$placeholder] = $query;
             }
 
-            $params = new FetchParams(page: $page, itemsPerPage: $itemsPerPage, bind: $binds);
+            if ($params?->getConditions()) {
+                $queryBuilder->where("AND " . $this->getWhereConditions($params));
+            }
+
+            $binds = array_merge($binds, $params?->getBind() ?? []);
+
+            $params = new FetchParams(page: $params?->getPage(), itemsPerPage: $params?->getItemsPerPage(), bind: $binds);
 
             $isPaginated = $params->getPage() !== null && $params->getItemsPerPage() !== null;
 
             $queryNonPaginated = $queryBuilder->getQuery();
 
             if ($isPaginated) {
-                $queryBuilder->paginate($page, $itemsPerPage);
+                $queryBuilder->paginate($params->getPage(), $params->getItemsPerPage());
             }
 
             $stmt = $this->pdo->prepare($queryBuilder->getQuery());
