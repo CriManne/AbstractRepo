@@ -432,10 +432,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
          */
         $modelData = $this->getModelData($model);
 
-        if (count($modelData) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
-        }
-
         /**
          * Get an array with just the columns names
          */
@@ -474,10 +470,6 @@ abstract class AbstractRepository implements Interfaces\IRepository
          * Retrieves all the data from the given model.
          */
         $modelData = $this->getModelData($model);
-
-        if (count($modelData) == 0) {
-            throw new Exceptions\RepositoryException(Exceptions\RepositoryException::NO_MODEL_DATA_FOUND);
-        }
 
         $keyProp = $this->modelHandler->getKey();
 
@@ -637,15 +629,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
             }
             // @codeCoverageIgnoreEnd
 
-            if (empty($value)) {
-                continue;
-            }
-
             // Array to store all the information to create the insert
             $values[] = new ModelField(
                 fieldName: $propertyName,
                 fieldType: $propertyType,
-                fieldValue: $value
+                fieldValue: $value ?? null
             );
 
         }
@@ -749,7 +737,11 @@ abstract class AbstractRepository implements Interfaces\IRepository
     private function bindValues(array $values, PDOStatement $stmt): PDOStatement
     {
         foreach ($values as $value) {
-            $type = PDOUtil::getPDOType($value->fieldType);
+            if ($value->fieldValue === null) {
+                $type = PDOUtil::NULL_TYPE;
+            } else {
+                $type = PDOUtil::getPDOType($value->fieldType);
+            }
 
             $placeholder = QueryBuilder::BIND_CHAR . $value->fieldName;
             $value       = $value->fieldValue;
