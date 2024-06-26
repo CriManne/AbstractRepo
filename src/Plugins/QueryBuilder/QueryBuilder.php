@@ -16,6 +16,9 @@ class QueryBuilder
      */
     public const string BIND_CHAR = ':';
 
+    public const string ORDER_ASC = 'ASC';
+    public const string ORDER_DESC = 'DESC';
+
     /**
      * Regex used to identify an array bind
      */
@@ -198,6 +201,15 @@ class QueryBuilder
         $offset = $page * $itemsPerPage;
 
         $this->append("LIMIT {$itemsPerPage} OFFSET {$offset}");
+
+        return $this;
+    }
+
+    public function orderBy(array $orderBy): self
+    {
+        $imploded = implode(',', $orderBy);
+
+        $this->append("ORDER BY {$imploded}");
 
         return $this;
     }
