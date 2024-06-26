@@ -110,8 +110,8 @@ abstract class AbstractRepository implements Interfaces\IRepository
     private function processModel(ReflectionClass $reflectionClass, ModelHandler $modelHandler): void
     {
         $modelHandler->searchableFieldsQueryBuilder
-            ->select(["{$this->tableName}.*"])
-            ->from("{$this->tableName} AS {$this->tableName}");
+            ->select(["`{$this->tableName}`.*"])
+            ->from(from: $this->tableName, alias: $this->tableName);
 
         $searchablePlaceholders = [];
         $searchableConditions = [];
@@ -295,7 +295,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                         $foreignKeyAlias = $foreignKeyTableName . $propertyName;
                         $foreignKeyPrimaryKeyColumnName = ReflectionUtility::getPrimaryKeyColumnName($propertyType);
 
-                        $joinCondition = "{$foreignKeyTableName} AS {$foreignKeyAlias} 
+                        $joinCondition = "`{$foreignKeyTableName}` AS {$foreignKeyAlias} 
                                                ON {$this->tableName}.{$foreignKeyColumnName} = {$foreignKeyAlias}.{$foreignKeyPrimaryKeyColumnName}";
 
                         if ($isRequired && !$allowsNull) {
@@ -322,7 +322,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
                 } else {
                     $placeHolder = "{$this->tableName}{$propertyName}";
 
-                    $searchableConditions[] = "{$this->tableName}.{$propertyName} LIKE :{$placeHolder}";
+                    $searchableConditions[] = "`{$this->tableName}`.{$propertyName} LIKE :{$placeHolder}";
                     $searchablePlaceholders[] = $placeHolder;
                 }
             }
@@ -763,7 +763,7 @@ abstract class AbstractRepository implements Interfaces\IRepository
     {
         $query = (new QueryBuilder())
             ->select(["COUNT(*) as itemsCount"])
-            ->from("({$subquery}) AS subquery")
+            ->from(from: "({$subquery})", alias: "subquery", useBacktick: false)
             ->getQuery();
 
         $stmt = $this->pdo->prepare($query);

@@ -25,3 +25,10 @@ CREATE TABLE T3
     v1 varchar(255) null,
     PRIMARY KEY (id)
 );
+
+CREATE TABLE `Order`
+(
+    id int          not null,
+    v1 varchar(255) null,
+    PRIMARY KEY (id)
+);
