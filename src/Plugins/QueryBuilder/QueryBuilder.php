@@ -39,6 +39,12 @@ class QueryBuilder
     private array $placeholders = [];
 
     /**
+     * Flag that indicates whether the where clause was already used
+     * @var bool
+     */
+    private bool $alreadyUsedWhere = false;
+
+    /**
      * @param string|null $conditions
      *
      * @return string[]
@@ -158,7 +164,12 @@ class QueryBuilder
      */
     public function where(string $condition): self
     {
-        $this->append("WHERE {$condition}");
+        if ($this->alreadyUsedWhere) {
+            $this->append("{$condition}");
+        } else {
+            $this->alreadyUsedWhere = true;
+            $this->append("WHERE {$condition}");
+        }
         return $this;
     }
 
