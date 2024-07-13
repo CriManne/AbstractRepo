@@ -1083,9 +1083,13 @@ abstract class AbstractRepository implements Interfaces\IRepository
 
             $binds = array_merge($binds, $params?->getBind() ?? []);
 
-            $params = new FetchParams(page: $params?->getPage(), itemsPerPage: $params?->getItemsPerPage(), bind: $binds);
+            $params = new FetchParams(page: $params?->getPage(), itemsPerPage: $params?->getItemsPerPage(), bind: $binds, orderBy: $params?->getOrderBy());
 
             $isPaginated = $params->getPage() !== null && $params->getItemsPerPage() !== null;
+
+            $orderBy = $params?->getOrderBy() ?? $this->getDefaultOrderBy();
+
+            $queryBuilder->orderBy($orderBy);
 
             $queryNonPaginated = $queryBuilder->getQuery();
 
