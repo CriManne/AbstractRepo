@@ -729,4 +729,51 @@ class SimpleTest extends BaseTestSuite
             )->getData()
         );
     }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSortingFind(): void
+    {
+        for ($i = 100; $i < 150; $i++) {
+            $t = new T1($i, "test" . $i);
+            self::$t1Repository->save($t);
+        }
+
+        $this->assertEquals(
+            'test141',
+            self::$t1Repository->find(
+                new FetchParams(
+                    page: 2,
+                    itemsPerPage: 4,
+                    orderBy: ['v1 DESC']
+                )
+            )->getData()[0]->v1
+        );
+    }
+
+    /**
+     * @return void
+     * @throws RepositoryException
+     */
+    public function testSortingFindByQuery(): void
+    {
+        for ($i = 100; $i < 150; $i++) {
+            $t = new T1($i, "test" . $i);
+            self::$t1Repository->save($t);
+        }
+
+        $this->assertEquals(
+            'test141',
+            self::$t1Repository->findByQuery(
+                'test',
+                new FetchParams(
+                    page: 2,
+                    itemsPerPage: 4,
+                    orderBy: ['v1 DESC']
+                )
+            )->getData()[0]->v1
+        );
+    }
 }
